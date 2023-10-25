@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2020.                            (c) 2020.
+*  (c) 2023.                            (c) 2023.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -79,12 +79,6 @@ import ca.nrc.cadc.reg.Interface;
 import ca.nrc.cadc.reg.Standards;
 import ca.nrc.cadc.reg.client.RegistryClient;
 import ca.nrc.cadc.util.StringUtil;
-import ca.nrc.cadc.vos.Direction;
-import ca.nrc.cadc.vos.Protocol;
-import ca.nrc.cadc.vos.Transfer;
-import ca.nrc.cadc.vos.TransferReader;
-import ca.nrc.cadc.vos.TransferWriter;
-import ca.nrc.cadc.vos.VOS;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
@@ -92,9 +86,13 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.log4j.Logger;
+import org.opencadc.vospace.VOS;
+import org.opencadc.vospace.transfer.Direction;
+import org.opencadc.vospace.transfer.Protocol;
+import org.opencadc.vospace.transfer.Transfer;
+import org.opencadc.vospace.transfer.TransferReader;
+import org.opencadc.vospace.transfer.TransferWriter;
 
 /**
  *
@@ -180,7 +178,7 @@ public class Spyglass implements PrivilegedExceptionAction<Void> {
         Transfer request = new Transfer(target, direction);
         request.version = VOS.VOSPACE_21;
         
-        String proto = VOS.PROTOCOL_HTTPS_GET;
+        URI proto = VOS.PROTOCOL_HTTPS_GET;
         if (Direction.pushToVoSpace.equals(direction)) {
             proto = VOS.PROTOCOL_HTTPS_PUT;
         }
@@ -208,7 +206,7 @@ public class Spyglass implements PrivilegedExceptionAction<Void> {
         }
         
         if (standardID != null) {
-            Protocol p = new Protocol(standardID.toASCIIString());
+            Protocol p = new Protocol(standardID);
             request.getProtocols().add(p);
         }
         

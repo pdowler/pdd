@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2020.                            (c) 2020.
+*  (c) 2023.                            (c) 2023.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -72,7 +72,6 @@ import ca.nrc.cadc.auth.AuthorizationToken;
 import ca.nrc.cadc.auth.CertCmdArgUtil;
 import ca.nrc.cadc.util.ArgumentMap;
 import ca.nrc.cadc.util.Log4jInit;
-import ca.nrc.cadc.vos.Direction;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.AccessControlException;
@@ -81,6 +80,7 @@ import java.util.List;
 import javax.security.auth.Subject;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.opencadc.vospace.transfer.Direction;
 
 /**
  *
@@ -98,8 +98,8 @@ public class Main {
                 Log4jInit.setLevel("org.opencadc.spyglass", Level.INFO);
             } else if (am.isSet("d") || am.isSet("debug")) {
                 Log4jInit.setLevel("org.opencadc.spyglass", Level.DEBUG);
+                Log4jInit.setLevel("org.opencadc.vospace", Level.DEBUG);
                 Log4jInit.setLevel("ca.nrc.cadc.reg", Level.DEBUG);
-                Log4jInit.setLevel("ca.nrc.cadc.vos", Level.DEBUG);
                 Log4jInit.setLevel("ca.nrc.cadc.net", Level.DEBUG);
             } 
                 
