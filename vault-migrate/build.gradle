@@ -1,0 +1,51 @@
+plugins {
+    id 'java'
+    id 'maven'
+    id 'application'
+    id 'checkstyle'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        url = 'https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/m2repo'
+    }
+    maven {
+        url "https://maven.restlet.talend.com"
+    }
+}
+
+apply from: '../opencadc.gradle'
+
+sourceCompatibility = 1.8
+
+group = 'org.opencadc'
+
+version = '0.1'
+
+mainClassName = 'org.opencadc.vault.migrate.Main'
+
+dependencies {
+    compile 'org.opencadc:cadc-util:[1.9,2.0)'
+
+    // destination
+    compile 'org.opencadc:cadc-vos:[2.0,)'
+    compile 'org.opencadc:cadc-vos-server:[2.0,)'
+    compile 'org.opencadc:cadc-inventory-db:[0.15,)'
+    compile 'org.opencadc:vault:0.1'
+
+    // source
+    compile 'org.opencadc:cadc-vos-syb:1.2.3'
+    compile 'org.opencadc:cadc-vos-server-syb:1.3.4'
+    compile 'org.opencadc:cadc-vos-server-db-syb:1.3.4'
+    compile 'ca.nrc.cadc:vospace-lib:1.2.4'
+
+    testCompile 'junit:junit:[4.12,5.0)'
+
+    runtime 'net.sourceforge.jtds:jtds:[1.0,)'
+}
+configurations {
+    // pulled in by vospace-lib and don't want to rebuild locally
+    runtime.exclude group: 'org.opencadc', module: 'cadc-vos-server-db'
+}
