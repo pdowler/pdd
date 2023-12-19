@@ -115,8 +115,6 @@ public class Spyglass implements PrivilegedExceptionAction<Void> {
         this.direction = direction;
     }
 
-   
-
     @Override
     public Void run() throws Exception {
         doit();
@@ -181,23 +179,22 @@ public class Spyglass implements PrivilegedExceptionAction<Void> {
         URI proto = VOS.PROTOCOL_HTTPS_GET;
         if (Direction.pushToVoSpace.equals(direction)) {
             proto = VOS.PROTOCOL_HTTPS_PUT;
+        } else if (Direction.BIDIRECTIONAL.equals(direction)) {
+            proto = VOS.PROTOCOL_SSHFS;
         }
         
+        URI[] sms = new URI[] {
+            null,
+            Standards.SECURITY_METHOD_CERT,
+            Standards.SECURITY_METHOD_TOKEN
+        };
+        
         if (securityMethod == null) {
-            // all
-            
-            // https+anon
-            Protocol sa = new Protocol(proto);
-            // https+cert
-            Protocol sc = new Protocol(proto);
-            sc.setSecurityMethod(Standards.SECURITY_METHOD_CERT);
-            // https+bearer token
-            Protocol bt = new Protocol(proto);
-            bt.setSecurityMethod(Standards.SECURITY_METHOD_TOKEN);
-
-            request.getProtocols().add(sa);
-            request.getProtocols().add(sc);
-            request.getProtocols().add(bt);
+            for (URI sm : sms) {
+                Protocol p = new Protocol(proto);
+                p.setSecurityMethod(sm);
+                request.getProtocols().add(p);
+            }
         } else {
             // specified
             Protocol p = new Protocol(proto);
@@ -207,6 +204,7 @@ public class Spyglass implements PrivilegedExceptionAction<Void> {
         
         if (standardID != null) {
             Protocol p = new Protocol(standardID);
+            p.setSecurityMethod(securityMethod);
             request.getProtocols().add(p);
         }
         

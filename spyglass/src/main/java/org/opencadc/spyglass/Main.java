@@ -113,7 +113,7 @@ public class Main {
             String d = pa.get(0);
             String t = pa.get(1);
             String secStr = am.getValue("securityMethod");
-            String sidStr = am.getValue("standardID");
+            String sidStr = am.getValue("protocol");
             
                         
             final Direction direction;
@@ -121,6 +121,8 @@ public class Main {
                 direction = Direction.pullFromVoSpace;
             } else if (Direction.pushToVoSpace.getValue().equals(d)) {
                 direction = Direction.pushToVoSpace;
+            } else if (Direction.BIDIRECTIONAL.getValue().equals(d)) {
+                direction = Direction.BIDIRECTIONAL;
             } else {
                 throw new IllegalArgumentException("invalid direction: " + d);
             }
@@ -163,14 +165,14 @@ public class Main {
     
     private static void usage() {
         System.out.println("usage: spyglass [options] --resourceID=<resourceID> <direction> <target> ");
-        System.out.println("                direction : pullFromVoSpace | pushToVoSpace");
-        // TODO: add direction = biDirectional
+        System.out.println("                direction : pullFromVoSpace | pushToVoSpace | biDirectional");
         System.out.println("                target : an Artifact.uri");
         System.out.println("options:        [-v|--verbose|-d|--debug]");
         System.out.println("                [--cert=<proxy cert>]");
         System.out.println("                [--token<access token> --domain=<server or domain name>]");
         System.out.println("                [--securityMethod=<uri>] : only request these security methods");
         System.out.println("                [--protocol=<uri>] : request this protocol (e.g. standardID of an API)");
+        System.out.println("   example for sshfs mount:   --protocol=ivo://cadc.nrc.ca/vospace#SSHFS");
         System.out.println("   example for raw SI locate: --protocol=http://www.opencadc.org/std/storage#files-1.0");
         
     }
