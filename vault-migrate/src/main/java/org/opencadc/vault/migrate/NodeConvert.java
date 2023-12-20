@@ -67,14 +67,19 @@
 
 package org.opencadc.vault.migrate;
 
+import ca.nrc.cadc.date.DateUtil;
 import ca.nrc.cadc.vos.VOS;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.text.DateFormat;
+import java.text.ParseException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.opencadc.gms.GroupURI;
+import org.opencadc.inventory.InventoryUtil;
 import org.opencadc.vospace.ContainerNode;
 import org.opencadc.vospace.DataNode;
 import org.opencadc.vospace.LinkNode;
@@ -90,32 +95,36 @@ public class NodeConvert {
 
     // list of props with special handling that are ignored if seen in the node.properties
     private static List<String> IGNORE_PROPS = Arrays.asList(new String[] {
-        VOS.PROPERTY_URI_AVAILABLESPACE,
-        VOS.PROPERTY_URI_CONTENTENCODING,
-        VOS.PROPERTY_URI_CONTENTLENGTH,
-        VOS.PROPERTY_URI_CONTENTMD5,
-        VOS.PROPERTY_URI_CREATION_DATE,
-        VOS.PROPERTY_URI_CREATOR,
-        VOS.PROPERTY_URI_DATE,
-        VOS.PROPERTY_URI_FORMAT,
-        VOS.PROPERTY_URI_GROUPMASK,
-        VOS.PROPERTY_URI_GROUPREAD,
-        VOS.PROPERTY_URI_GROUPWRITE,
-        VOS.PROPERTY_URI_ISLOCKED,
-        VOS.PROPERTY_URI_ISPUBLIC,
-        VOS.PROPERTY_URI_QUOTA,
-        VOS.PROPERTY_URI_READABLE,
-        VOS.PROPERTY_URI_TYPE,
-        VOS.PROPERTY_URI_WRITABLE
+        
+        VOS.PROPERTY_URI_CONTENTENCODING, // artifact.contentEncoding
+        VOS.PROPERTY_URI_CONTENTLENGTH, // artifact.contentLength
+        VOS.PROPERTY_URI_CONTENTMD5, // artifact.contentChecksum
+        VOS.PROPERTY_URI_TYPE, // artifact.contentType
+        VOS.PROPERTY_URI_CREATION_DATE, // not exposed by src, no where to put it in v2
+        VOS.PROPERTY_URI_CREATOR, // node.ownerID
+        VOS.PROPERTY_URI_DATE, // node.lastModified
+        VOS.PROPERTY_URI_FORMAT, // ??
+        VOS.PROPERTY_URI_GROUPMASK, // obsolete
+        VOS.PROPERTY_URI_GROUPREAD, // node
+        VOS.PROPERTY_URI_GROUPWRITE, // node
+        VOS.PROPERTY_URI_ISLOCKED, // node
+        VOS.PROPERTY_URI_ISPUBLIC, // node
+        VOS.PROPERTY_URI_READABLE, // dynamic
+        VOS.PROPERTY_URI_WRITABLE, // dynamic
+        
+        VOS.PROPERTY_URI_AVAILABLESPACE, // computed internally
+        VOS.PROPERTY_URI_QUOTA, // manually set later??
     });
     
     private final UUID rootID;
+    private final DateFormat df = DateUtil.getDateFormat(DateUtil.IVOA_DATE_FORMAT, DateUtil.UTC);
     
     public NodeConvert(UUID rootID) {
         this.rootID = rootID;
     }
     
-    public Node convert(ca.nrc.cadc.vos.Node in) throws URISyntaxException {
+    public Node convert(ca.nrc.cadc.vos.Node in) 
+            throws ParseException, URISyntaxException {
         ca.nrc.cadc.vos.server.NodeID nid = (ca.nrc.cadc.vos.server.NodeID) in.appData;
         UUID id = new UUID(0L, nid.id);
             
@@ -144,8 +153,12 @@ public class NodeConvert {
         throw new UnsupportedOperationException("convert " + in.getClass().getName());
     }
     
-    private void copyCommon(ca.nrc.cadc.vos.server.NodeID nid, ca.nrc.cadc.vos.Node in, Node ret) throws URISyntaxException {
-        ret.isLocked = in.isLocked();
+    private void copyCommon(ca.nrc.cadc.vos.server.NodeID nid, ca.nrc.cadc.vos.Node in, Node ret) 
+            throws ParseException, URISyntaxException {
+        if (in.isLocked()) {
+            // allow null
+            ret.isLocked = in.isLocked();
+        }
         ret.isPublic = in.isPublic();
         
         ret.ownerID = nid.ownerObject; // ACIdentityManager specific behaviour
@@ -177,9 +190,14 @@ public class NodeConvert {
             }
         }
         
+        raw = in.getPropertyValue(ca.nrc.cadc.vos.VOS.PROPERTY_URI_DATE);
+        if (raw != null) {
+            Date val = df.parse(raw);
+            InventoryUtil.assignLastModified(ret, val);
+        }
         for (ca.nrc.cadc.vos.NodeProperty ip : in.getProperties()) {
             if (!IGNORE_PROPS.contains(ip.getPropertyURI())) {
-                NodeProperty np = new NodeProperty(URI.create(ip.getPropertyURI()), ip.getPropertyValue());
+                NodeProperty np = new NodeProperty(new URI(ip.getPropertyURI()), ip.getPropertyValue());
                 ret.getProperties().add(np);
             }
         }

@@ -79,6 +79,8 @@ import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import ca.nrc.cadc.vospace.VOSpaceNodePersistence;
 import java.io.File;
 import java.net.URI;
+import java.security.PrivilegedActionException;
+import java.util.List;
 import javax.security.auth.Subject;
 import javax.sql.DataSource;
 import org.apache.log4j.Level;
@@ -115,6 +117,14 @@ public class Main {
                 System.exit(0);
             }
             
+            final boolean recursive = am.isSet("r") || am.isSet("recursive");
+            final List<String> nodes = am.getPositionalArgs();
+            if (recursive && nodes.isEmpty()) {
+                System.out.println("INVALID: cannot use recursive mode without specifying 1 or more top level containers");
+                usage();
+                System.exit(-1);
+            }
+            
             // local config
             System.setProperty(IdentityManager.class.getName(), ACIdentityManager.class.getName());
             System.setProperty("user.home", "servops");
@@ -126,13 +136,13 @@ public class Main {
             ConnectionConfig syb = dbrc.getConnectionConfig("SYBVAULT", "vospace2");
             DBUtil.createJNDIDataSource(VOSpaceNodePersistence.DATASOURCE_NAME, syb);
             final DatabaseNodePersistence src = new VOSpaceNodePersistence();
-            log.info("connected to source: " + syb.getServer() + " " + syb.getDatabase());
+            log.info("source ready: " + syb.getServer() + " " + syb.getDatabase() + "\n");
             
             ConnectionConfig pg = dbrc.getConnectionConfig("PGVAULT", "content");
             DBUtil.createJNDIDataSource("jdbc/nodes", pg);
             DataSource vds = DBUtil.findJNDIDataSource("jdbc/nodes");
             
-            log.info("init database for inventory: START");
+            log.info("init destination database for inventory: START");
             InitDatabase si = new InitDatabase(vds, null, "inventory");
             si.doInit();
             log.info("init database for inventory: OK");
@@ -142,10 +152,16 @@ public class Main {
             log.info("init database for vospace: OK");
             
             final NodePersistenceImpl dest = new NodePersistenceImpl(URI.create("ivo://cadc.nrc.ca/vault"));
-            log.info("connected to destination: " + pg.getServer() + " " + pg.getDatabase());
+            log.info("destination ready: " + pg.getServer() + " " + pg.getDatabase() + "\n");
             
             Migrate mig = new Migrate(src, dest);
-            Subject.doAs(subject, mig);
+            mig.setRecursive(recursive);
+            mig.setNodes(nodes);
+            try {
+                Subject.doAs(subject, mig);
+            } catch (PrivilegedActionException pex) {
+                throw pex.getException();
+            }
             
         } catch (Exception unexpected) {
             log.error("FAIL", unexpected);
@@ -155,8 +171,7 @@ public class Main {
     }
     
     private static void usage() {
-        System.out.println("usage: vault-migrate [options] ....");
+        System.out.println("usage: vault-migrate [options] [-r|--recursive] <container node> [<container node> ...");
         System.out.println("options:        [-v|--verbose|-d|--debug]");
-        
     }
 }

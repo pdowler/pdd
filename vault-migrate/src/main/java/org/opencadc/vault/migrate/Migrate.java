@@ -67,14 +67,17 @@
 
 package org.opencadc.vault.migrate;
 
+import ca.nrc.cadc.vos.ContainerNode;
 import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
 import org.apache.log4j.Logger;
-import org.opencadc.gms.GroupURI;
 import org.opencadc.vault.NodePersistenceImpl;
 import org.opencadc.vospace.Node;
-import org.opencadc.vospace.NodeProperty;
 
 /**
  *
@@ -87,22 +90,78 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
     
     private final DatabaseNodePersistence src;
     private final NodePersistenceImpl dest;
+    private final NodeConvert conv;
+    
+    private final List<String> nodes = new ArrayList<>();
+    private boolean recursive = false;
     
     public Migrate(DatabaseNodePersistence src, NodePersistenceImpl dest) {
         this.src = src;
         this.dest = dest;
+        this.conv = new NodeConvert(dest.getRootNode().getID());
     }
 
+    public void setNodes(List<String> nodes) {
+        this.nodes.addAll(nodes);
+    }
+    
+    public void setRecursive(boolean r) {
+        this.recursive = r;
+    }
+    
     @Override
     public Void run() throws Exception {
-        NodeConvert conv = new NodeConvert(dest.getRootNode().getID());
-        
-        // query src for nodes
+        // careful in root container
         ca.nrc.cadc.vos.ContainerNode srcRoot = (ca.nrc.cadc.vos.ContainerNode) src.get(SRCROOT);
-        src.getChildren(srcRoot, true);
+        if (nodes.isEmpty()) {
+            src.getChildren(srcRoot);
+        } else {
+            for (String name : nodes) {
+                src.getChild(srcRoot, name);
+            }
+        }
         
         for (ca.nrc.cadc.vos.Node in : srcRoot.getNodes()) {
-            Node n = conv.convert(in);
+            // ouch: one query per node
+            src.getProperties(in);
+        }
+        
+        List<ca.nrc.cadc.vos.Node> srcNodes = srcRoot.getNodes();
+        List<Node> nodes = convertBatch(srcNodes);
+        persistBatch(nodes);
+        
+        return null;
+    }
+    
+    // query source and convert
+    private List<Node> getBatch(ca.nrc.cadc.vos.ContainerNode icn) throws Exception {
+        src.getChildren(icn); // TODO: batch state
+        return convertBatch(icn.getNodes());
+    }
+    
+    private List<Node> convertBatch(List<ca.nrc.cadc.vos.Node> inodes) throws Exception {
+        List<Node> ret = new ArrayList<>();
+        Iterator<ca.nrc.cadc.vos.Node> iter = inodes.iterator();
+        while (iter.hasNext()) {
+            ca.nrc.cadc.vos.Node in = iter.next();
+            // OUCH: one query per node
+            // TODO: there are only 6e6 node properties in the separate table (~500KiB data)
+            // so we could query for those once and keep a HashMap<UUID, NodeProperty> in memory
+            src.getProperties(in);
+            try {
+                Node n = conv.convert(in);
+                ret.add(n);
+            } catch (Exception ex) {
+                throw new RuntimeException("CONVERT FAIL: " + in.getName(), ex);
+            }
+        }
+        return ret;
+    }
+    
+    private void persistBatch(List<Node> nodes) throws Exception {
+        ListIterator<Node> iter = nodes.listIterator();
+        while (iter.hasNext()) {
+            Node n = iter.next();
             StringBuilder sb = new StringBuilder();
             sb.append("put: ");
             sb.append(" ").append(n.getID());
@@ -114,10 +173,34 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
             }
             log.info(sb.toString());
             dest.put(n);
+            iter.remove();
+        }
+    }
+    
+    private static class RecursiveIterator implements Iterator<ca.nrc.cadc.vos.ContainerNode> {
+
+        private Iterator<ca.nrc.cadc.vos.Node> inner;
+
+        public RecursiveIterator(Iterator<ca.nrc.cadc.vos.Node> inner) {
+            this.inner = inner;
         }
         
-        // insert into dest
+        @Override
+        public boolean hasNext() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ContainerNode next() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
         
-        return null;
+        
+        
     }
 }
