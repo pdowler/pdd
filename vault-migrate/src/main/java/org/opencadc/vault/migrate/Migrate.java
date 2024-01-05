@@ -94,6 +94,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
     
     private final List<String> nodes = new ArrayList<>();
     private boolean recursive = false;
+    private boolean dryrun = false;
     
     public Migrate(DatabaseNodePersistence src, NodePersistenceImpl dest) {
         this.src = src;
@@ -108,7 +109,11 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
     public void setRecursive(boolean r) {
         this.recursive = r;
     }
-    
+
+    public void setDryrun(boolean dryrun) {
+        this.dryrun = dryrun;
+    }
+
     @Override
     public Void run() throws Exception {
         // careful in root container
@@ -121,86 +126,45 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
             }
         }
         
-        for (ca.nrc.cadc.vos.Node in : srcRoot.getNodes()) {
-            // ouch: one query per node
-            src.getProperties(in);
+        long num = 0;
+        SourceNodeIterator iter = null;
+        if (recursive) {
+            iter = new SourceNodeIterator(src);
         }
-        
-        List<ca.nrc.cadc.vos.Node> srcNodes = srcRoot.getNodes();
-        List<Node> nodes = convertBatch(srcNodes);
-        persistBatch(nodes);
+        long start = System.currentTimeMillis();
+        for (ca.nrc.cadc.vos.Node in : srcRoot.getNodes()) {
+            src.getProperties(in);
+            num++;
+            System.out.println(num + " " + in.getClass().getSimpleName() + " " + in.getUri().getPath());
+            Node nn = conv.convert(in);
+            if (!dryrun) {
+                dest.put(nn);
+            }
+            
+            if (recursive) {
+                // assume container
+                ca.nrc.cadc.vos.ContainerNode icn = (ca.nrc.cadc.vos.ContainerNode) in;
+                iter.setContainer(icn);
+                String fmt = "%d %s %s";
+                while (iter.hasNext()) {
+                    ca.nrc.cadc.vos.Node sn = iter.next();
+                    Node out = conv.convert(sn);
+                    num++;
+                    System.out.println(String.format(fmt, num, sn.getClass().getSimpleName(), sn.getUri().getPath()));
+                    if (!dryrun) {
+                        dest.put(out);
+                    }
+                }
+                log.info("maxRecursionQueueSize: " + iter.maxRecursionQueueSize);
+            }
+        }
+        long dt = System.currentTimeMillis() - start;
+        long sec = dt / 1000L;
+        long rate = num / sec;
+        log.info("migrated " + num + " nodes in " + sec + "sec aka ~" + rate + " nodes/sec");
         
         return null;
     }
-    
-    // query source and convert
-    private List<Node> getBatch(ca.nrc.cadc.vos.ContainerNode icn) throws Exception {
-        src.getChildren(icn); // TODO: batch state
-        return convertBatch(icn.getNodes());
-    }
-    
-    private List<Node> convertBatch(List<ca.nrc.cadc.vos.Node> inodes) throws Exception {
-        List<Node> ret = new ArrayList<>();
-        Iterator<ca.nrc.cadc.vos.Node> iter = inodes.iterator();
-        while (iter.hasNext()) {
-            ca.nrc.cadc.vos.Node in = iter.next();
-            // OUCH: one query per node
-            // TODO: there are only 6e6 node properties in the separate table (~500KiB data)
-            // so we could query for those once and keep a HashMap<UUID, NodeProperty> in memory
-            src.getProperties(in);
-            try {
-                Node n = conv.convert(in);
-                ret.add(n);
-            } catch (Exception ex) {
-                throw new RuntimeException("CONVERT FAIL: " + in.getName(), ex);
-            }
-        }
-        return ret;
-    }
-    
-    private void persistBatch(List<Node> nodes) throws Exception {
-        ListIterator<Node> iter = nodes.listIterator();
-        while (iter.hasNext()) {
-            Node n = iter.next();
-            StringBuilder sb = new StringBuilder();
-            sb.append("put: ");
-            sb.append(" ").append(n.getID());
-            sb.append(" ").append(n.getClass().getSimpleName());
-            sb.append(" ").append(n.getName());
-            sb.append(" ").append(n.ownerID);
-            if (n.ownerID != null) {
-                sb.append("(").append(n.ownerID.getClass().getSimpleName()).append(")");
-            }
-            log.info(sb.toString());
-            dest.put(n);
-            iter.remove();
-        }
-    }
-    
-    private static class RecursiveIterator implements Iterator<ca.nrc.cadc.vos.ContainerNode> {
 
-        private Iterator<ca.nrc.cadc.vos.Node> inner;
-
-        public RecursiveIterator(Iterator<ca.nrc.cadc.vos.Node> inner) {
-            this.inner = inner;
-        }
-        
-        @Override
-        public boolean hasNext() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public ContainerNode next() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-        
-        
-        
-    }
-}
+    
+}    

@@ -85,6 +85,7 @@ import org.opencadc.vospace.DataNode;
 import org.opencadc.vospace.LinkNode;
 import org.opencadc.vospace.Node;
 import org.opencadc.vospace.NodeProperty;
+import org.opencadc.vospace.VOSURI;
 
 /**
  *
@@ -145,7 +146,17 @@ public class NodeConvert {
         }
         
         if (in instanceof ca.nrc.cadc.vos.LinkNode) {
-            LinkNode ret = new LinkNode(id, in.getName(), ((ca.nrc.cadc.vos.LinkNode) in).getTarget());
+            ca.nrc.cadc.vos.LinkNode iln = (ca.nrc.cadc.vos.LinkNode) in;
+            URI target = iln.getTarget();
+            if ("vos".equals(target.getScheme())) {
+                // convert link nodes to preferred form
+                StringBuilder sb = new StringBuilder();
+                sb.append(target.getScheme()).append("://");
+                sb.append(target.getAuthority().replaceAll("!", "~"));
+                sb.append(target.getPath());
+                target = new URI(sb.toString());
+            }
+            LinkNode ret = new LinkNode(id, in.getName(), target);
             copyCommon(nid, in, ret);
             return ret;
         }
@@ -173,20 +184,25 @@ public class NodeConvert {
         if (raw != null) {
             String[] groups = raw.split(" ");
             for (String s : groups) {
-                s = s.replace('#', '?');
-                URI u = new URI(s);
-                GroupURI g = new GroupURI(u);
-                ret.getReadOnlyGroup().add(g);
+                s = s.replace('#', '?').trim();
+                if (s.length() > 0) {
+                    URI u = new URI(s);
+                    GroupURI g = new GroupURI(u);
+                    ret.getReadOnlyGroup().add(g);
+                }
             }
         }
+        
         raw = in.getPropertyValue(ca.nrc.cadc.vos.VOS.PROPERTY_URI_GROUPWRITE);
         if (raw != null) {
             String[] groups = raw.split(" ");
             for (String s : groups) {
-                s = s.replace('#', '?');
-                URI u = new URI(s);
-                GroupURI g = new GroupURI(u);
-                ret.getReadWriteGroup().add(g);
+                s = s.replace('#', '?').trim();
+                if (s.length() > 0) {
+                    URI u = new URI(s);
+                    GroupURI g = new GroupURI(u);
+                    ret.getReadWriteGroup().add(g);
+                }
             }
         }
         
@@ -195,10 +211,15 @@ public class NodeConvert {
             Date val = df.parse(raw);
             InventoryUtil.assignLastModified(ret, val);
         }
+        
         for (ca.nrc.cadc.vos.NodeProperty ip : in.getProperties()) {
             if (!IGNORE_PROPS.contains(ip.getPropertyURI())) {
-                NodeProperty np = new NodeProperty(new URI(ip.getPropertyURI()), ip.getPropertyValue());
-                ret.getProperties().add(np);
+                try {
+                    NodeProperty np = new NodeProperty(new URI(ip.getPropertyURI()), ip.getPropertyValue());
+                    ret.getProperties().add(np);
+                } catch (URISyntaxException ex) {
+                    log.warn("invalid property uri " + ip.getPropertyURI() + " in " + in.getUri().getURI().toASCIIString());
+                }
             }
         }
     }

@@ -102,12 +102,12 @@ public class Main {
             Log4jInit.setLevel("org.opencadc", Level.WARN);
             Log4jInit.setLevel("ca.nrc.cadc", Level.WARN);
             if (am.isSet("v") || am.isSet("verbose")) {
-                Log4jInit.setLevel("org.opencadc.vault", Level.INFO);
+                Log4jInit.setLevel("ca.nrc.cadc.db.version", Level.INFO);
+                Log4jInit.setLevel("org.opencadc.vault.migrate", Level.INFO);
+                
             } else if (am.isSet("d") || am.isSet("debug")) {
-                Log4jInit.setLevel("org.opencadc.vault", Level.DEBUG);
-                Log4jInit.setLevel("org.opencadc.vospace", Level.DEBUG);
-                Log4jInit.setLevel("ca.nrc.cadc.reg", Level.DEBUG);
-                Log4jInit.setLevel("ca.nrc.cadc.net", Level.DEBUG);
+                Log4jInit.setLevel("ca.nrc.cadc.db.version", Level.DEBUG);
+                Log4jInit.setLevel("org.opencadc.vault.migrate", Level.DEBUG);
             } 
                 
             boolean help = am.isSet("h") || am.isSet("help");
@@ -156,6 +156,7 @@ public class Main {
             
             Migrate mig = new Migrate(src, dest);
             mig.setRecursive(recursive);
+            mig.setDryrun(am.isSet("dryrun"));
             mig.setNodes(nodes);
             try {
                 Subject.doAs(subject, mig);
@@ -171,7 +172,7 @@ public class Main {
     }
     
     private static void usage() {
-        System.out.println("usage: vault-migrate [options] [-r|--recursive] <container node> [<container node> ...");
+        System.out.println("usage: vault-migrate [options] [--dryrun] [-r|--recursive] <container node> [<container node> ...");
         System.out.println("options:        [-v|--verbose|-d|--debug]");
     }
 }
