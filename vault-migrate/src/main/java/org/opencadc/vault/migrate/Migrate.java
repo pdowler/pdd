@@ -156,12 +156,13 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
                     }
                 }
                 log.info("maxRecursionQueueSize: " + iter.maxRecursionQueueSize);
+                log.info("timeQuerying: " + iter.timeQuerying + "ms");
             }
         }
         long dt = System.currentTimeMillis() - start;
         long sec = dt / 1000L;
         long rate = num / sec;
-        log.info("migrated " + num + " nodes in " + sec + "sec aka ~" + rate + " nodes/sec");
+        log.info("migrated " + num + " nodes in " + dt + "ms (" + sec + "sec) aka ~" + rate + " nodes/sec");
         
         return null;
     }

@@ -103,9 +103,11 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
     private LinkedList<ContainerNode> recursionQueue = new LinkedList<>();
     private ContainerNode curParent;
     private Node curNode;
+    private boolean lastBatchPartial;
     
     private Map<Long,List<NodeProperty>> propMap;
     int maxRecursionQueueSize = 0;
+    long timeQuerying = 0L;
     
     public SourceNodeIterator(DatabaseNodePersistence nodePer) {
         this.nodePer = nodePer;
@@ -114,9 +116,11 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
 
     public void setContainer(ContainerNode curParent) {
         this.curParent = curParent;
+        // start new base parent
         this.curNode = null;
-        batch.clear(); // just in case
-        recursionQueue.clear(); // just in case
+        this.lastBatchPartial = false;
+        batch.clear();          
+        recursionQueue.clear();
         advance();
     }
     
@@ -133,11 +137,6 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
         } catch (NamingException ex) {
             throw new RuntimeException("failed to find " + VOSpaceNodePersistence.DATASOURCE_NAME + " via JNDI");
         }
-    }
-    
-    private class NPI {
-        Long id;
-        NodeProperty np;
     }
     
     private class NPRowMapper implements ResultSetExtractor<Map<Long,List<NodeProperty>>> {
@@ -200,43 +199,60 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
         if (!batch.isEmpty()) {
             curNode = batch.pop();
             if (curNode instanceof ContainerNode) {
-                // save for later: no limit on size in mem
+                log.debug("recursionQueue.push: " + curNode.getUri());
                 recursionQueue.push((ContainerNode) curNode);
-                maxRecursionQueueSize = Math.max(maxRecursionQueueSize, batch.size());
+                maxRecursionQueueSize = Math.max(maxRecursionQueueSize, recursionQueue.size());
             }
             return;
         }
-        // get next batch in curParent
-        VOSURI vuri = null;
-        if (curNode != null) {
-            vuri = curNode.getUri();
-        }
-        log.debug("advance: query " + curParent.getUri() + " from " + vuri);
-        // TODO: make batch a blocking queue and move src query to a separate thread
-        nodePer.getChildren(curParent, vuri, 1000);
-        batch.addAll(curParent.getNodes());
-        curParent.getNodes().clear();
-        log.debug("advance: found " + batch.size());
         
-        curNode = null;
-        if (!batch.isEmpty()) {
-            curNode = batch.pop();
-            if (curNode.getUri().equals(vuri)) {
-                log.debug("advance: skip dupicate " + vuri);
-                curNode = null;
-                if (!batch.isEmpty()) {
-                    curNode = batch.pop();
+        if (!lastBatchPartial) {
+            // get next batch in curParent
+            VOSURI vuri = null;
+            if (curNode != null) {
+                vuri = curNode.getUri();
+            }
+            
+            log.debug("advance: query " + curParent.getUri() + " from " + vuri);
+            // TODO: make batch a blocking queue and move src query to a separate thread?
+            long start = System.currentTimeMillis();
+            nodePer.getChildren(curParent, vuri, 1000);
+            this.timeQuerying += System.currentTimeMillis() - start;
+            batch.addAll(curParent.getNodes());
+            curParent.getNodes().clear();
+            log.debug("advance: found " + batch.size());
+            lastBatchPartial = (batch.size() < 1000);
+            curNode = null;
+            if (!batch.isEmpty()) {
+                curNode = batch.pop();
+                if (curNode.getUri().equals(vuri)) {
+                    log.warn("advance: skip dupicate " + vuri);
+                    curNode = null;
+                    if (!batch.isEmpty()) {
+                        curNode = batch.pop();
+                    }
                 }
             }
-        }
-        if (curNode != null) {
-            return;
+            if (curNode != null) {
+                if (curNode instanceof ContainerNode) {
+                    log.debug("recursionQueue.push: " + curNode.getUri());
+                    recursionQueue.push((ContainerNode) curNode);
+                    maxRecursionQueueSize = Math.max(maxRecursionQueueSize, recursionQueue.size());
+                }
+                return;
+            }
+        } else {
+            log.debug("avoided extra query for last node in container " + curParent.getUri());
+            
         }
         
-        // batch is empty: finished curParent
+        // finished curParent
+        lastBatchPartial = false;
         curParent = null;
+        curNode = null;
         if (!recursionQueue.isEmpty()) {
             curParent = recursionQueue.pop();
+            log.debug("recursionQueue.pop: " + curParent.getUri());
         }
         if (curParent != null) {
             advance();
