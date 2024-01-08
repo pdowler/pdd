@@ -68,13 +68,16 @@
 package org.opencadc.vault.migrate;
 
 import ca.nrc.cadc.vos.ContainerNode;
+import ca.nrc.cadc.vos.VOSURI;
 import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
+import java.util.NoSuchElementException;
+import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.log4j.Logger;
 import org.opencadc.vault.NodePersistenceImpl;
 import org.opencadc.vospace.Node;
@@ -132,40 +135,111 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
             iter = new SourceNodeIterator(src);
         }
         long start = System.currentTimeMillis();
+        long blocked = 0L;
+        long pmin = Long.MAX_VALUE;
+        long pmax = 0L;
+        long ptotal = 0L;
         for (ca.nrc.cadc.vos.Node in : srcRoot.getNodes()) {
             src.getProperties(in);
             num++;
             System.out.println(num + " " + in.getClass().getSimpleName() + " " + in.getUri().getPath());
             Node nn = conv.convert(in);
             if (!dryrun) {
+                long t1 = System.nanoTime();
                 dest.put(nn);
+                long pt = System.nanoTime() - t1;
+                ptotal += pt;
+                pmin = Math.min(pmin, pt);
+                pmax = Math.max(pmax, pt);
             }
             
-            if (recursive) {
-                // assume container
+            if (recursive && in instanceof ca.nrc.cadc.vos.ContainerNode) {
                 ca.nrc.cadc.vos.ContainerNode icn = (ca.nrc.cadc.vos.ContainerNode) in;
                 iter.setContainer(icn);
-                String fmt = "%d %s %s";
-                while (iter.hasNext()) {
-                    ca.nrc.cadc.vos.Node sn = iter.next();
-                    Node out = conv.convert(sn);
-                    num++;
-                    System.out.println(String.format(fmt, num, sn.getClass().getSimpleName(), sn.getUri().getPath()));
-                    if (!dryrun) {
-                        dest.put(out);
+                LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue = new LinkedBlockingQueue<>(2000);
+                NodeProducer producer = new NodeProducer(iter, queue);
+                final String fmt = "%d %s %s";
+                boolean done = false;
+                while (!done) {
+                    long b1 = System.nanoTime();
+                    ca.nrc.cadc.vos.Node sn = queue.take(); // blocks
+                    blocked += System.nanoTime() - b1;
+                    if (producer.terminate == sn) {
+                        done = true;
+                    } else {
+                        Node out = conv.convert(sn);
+                        num++;
+                        log.info(String.format(fmt, num, sn.getClass().getSimpleName(), sn.getUri().getPath()));
+                        if (!dryrun) {
+                            long t1 = System.nanoTime();
+                            dest.put(out);
+                            long pt = System.nanoTime() - t1;
+                            ptotal += pt;
+                            pmin = Math.min(pmin, pt);
+                            pmax = Math.max(pmax, pt);
+                        }
                     }
                 }
-                log.info("maxRecursionQueueSize: " + iter.maxRecursionQueueSize);
-                log.info("timeQuerying: " + iter.timeQuerying + "ms");
+                log.info("source-maxRecursionQueueSize: " + iter.maxRecursionQueueSize);
+                log.info("source-timeQuerying: " + iter.timeQuerying + "ms");
+
+                final String blockFmt = "queue-take: %.2f ms";
+                log.info(String.format(blockFmt, ((double) blocked) / 1.0e6));
+
+                if (!dryrun) {
+                    final String putFmt = dest.getClass().getSimpleName() + ".%s: %.2f ms";
+                    log.info(String.format(putFmt, "min-put", ((double) pmin) / 1.0e6));
+                    log.info(String.format(putFmt, "max-put", ((double) pmax) / 1.0e6));
+                    log.info(String.format(putFmt, "total-put", ((double) ptotal) / 1.0e6));
+                }
             }
         }
         long dt = System.currentTimeMillis() - start;
+        long tpn = dt / num;
         long sec = dt / 1000L;
-        long rate = num / sec;
+        long rate = 1000 / tpn;
         log.info("migrated " + num + " nodes in " + dt + "ms (" + sec + "sec) aka ~" + rate + " nodes/sec");
         
         return null;
     }
 
+    private class NodeProducer implements Runnable {
+        private Iterator<ca.nrc.cadc.vos.Node> inner;
+        private final LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue;
+        ca.nrc.cadc.vos.Node terminate = new TerminateNode();
+
+        public NodeProducer(Iterator<ca.nrc.cadc.vos.Node> inner,LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue) {
+            this.inner = inner;
+            this.queue = queue;
+            Thread bg = new Thread(this);
+            bg.setDaemon(true);
+            bg.start();
+        }
+        
+        @Override
+        public void run() {
+            log.warn("ThreadedNodeIterator.run() START");
+            int num = 0;
+            while (inner.hasNext()) {
+                try {
+                    queue.put(inner.next()); // block at capacity
+                    num++;
+                } catch (InterruptedException ex) {
+                    log.warn("ThreadedNodeIterator.run() interrupted");
+                }
+            }
+            try {
+                queue.put(terminate);
+            } catch (InterruptedException ex) {
+                log.warn("ThreadedNodeIterator.run() interrupted");
+            }
+            log.warn("ThreadedNodeIterator.run() DONE num=" + num);
+        }
+    }
     
+    private class TerminateNode extends ca.nrc.cadc.vos.LinkNode {
+        public TerminateNode() {
+            super(new VOSURI(URI.create("vos://authority~service/terminate")), URI.create("vos:terminate"));
+        }
+    }
 }    

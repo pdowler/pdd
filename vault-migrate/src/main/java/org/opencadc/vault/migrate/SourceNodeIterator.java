@@ -99,8 +99,8 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
 
     private final DatabaseNodePersistence nodePer;
     
-    private LinkedList<Node> batch = new LinkedList<>();
-    private LinkedList<ContainerNode> recursionQueue = new LinkedList<>();
+    private final LinkedList<Node> batch = new LinkedList<>();
+    private final LinkedList<ContainerNode> recursionQueue = new LinkedList<>();
     private ContainerNode curParent;
     private Node curNode;
     private boolean lastBatchPartial;
@@ -108,6 +108,7 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
     private Map<Long,List<NodeProperty>> propMap;
     int maxRecursionQueueSize = 0;
     long timeQuerying = 0L;
+    private boolean firstBatch = true;
     
     public SourceNodeIterator(DatabaseNodePersistence nodePer) {
         this.nodePer = nodePer;
@@ -121,7 +122,6 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
         this.lastBatchPartial = false;
         batch.clear();          
         recursionQueue.clear();
-        advance();
     }
     
     private void init() {
@@ -171,11 +171,20 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
     
     @Override
     public boolean hasNext() {
+        if (firstBatch) {
+            advance();
+            firstBatch = false;
+        }
         return curNode != null;
     }
 
     @Override
     public Node next() {
+        if (firstBatch) {
+            advance();
+            firstBatch = false;
+        }
+        
         if (curNode == null) {
             throw new NoSuchElementException();
         }
