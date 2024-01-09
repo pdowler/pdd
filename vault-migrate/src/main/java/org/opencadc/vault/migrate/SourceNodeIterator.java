@@ -105,16 +105,16 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
     private Node curNode;
     private boolean lastBatchPartial;
     
-    private Map<Long,List<NodeProperty>> propMap;
+    private final Map<Long,List<NodeProperty>> propMap;
     int maxRecursionQueueSize = 0;
     long timeQuerying = 0L;
     private boolean firstBatch = true;
     
-    public SourceNodeIterator(DatabaseNodePersistence nodePer) {
+    public SourceNodeIterator(DatabaseNodePersistence nodePer, Map<Long,List<NodeProperty>> propMap) {
         this.nodePer = nodePer;
-        init();
+        this.propMap = propMap;
     }
-
+    
     public void setContainer(ContainerNode curParent) {
         this.curParent = curParent;
         // start new base parent
@@ -124,22 +124,22 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
         recursionQueue.clear();
     }
     
-    private void init() {
-        // TODO: query and cache node properties
+    static final Map<Long,List<NodeProperty>> initPropMap() {
         try {
             DataSource ds = DBUtil.findJNDIDataSource(VOSpaceNodePersistence.DATASOURCE_NAME);
             String sql = "SELECT nodeID, propertyURI, propertyValue FROM NodeProperty order by nodeID";
             JdbcTemplate jdbc = new JdbcTemplate(ds);
             log.info("building NodeProperty cache ...");
             NPRowMapper npr = new NPRowMapper();
-            this.propMap = jdbc.query(sql, npr);
-            log.info("NodeProperty cache: " + npr.numProps + " props for " + propMap.size() + " distinct nodes");
+            Map<Long,List<NodeProperty>> ret = jdbc.query(sql, npr);
+            log.info("NodeProperty cache: " + npr.numProps + " props for " + ret.size() + " distinct nodes");
+            return ret;
         } catch (NamingException ex) {
             throw new RuntimeException("failed to find " + VOSpaceNodePersistence.DATASOURCE_NAME + " via JNDI");
         }
     }
     
-    private class NPRowMapper implements ResultSetExtractor<Map<Long,List<NodeProperty>>> {
+    private static class NPRowMapper implements ResultSetExtractor<Map<Long,List<NodeProperty>>> {
 
         long numProps = 0L;
         

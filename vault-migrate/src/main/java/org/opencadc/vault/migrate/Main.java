@@ -132,14 +132,23 @@ public class Main {
             Subject subject = SSLUtil.createSubject(cert);
             log.info("running as: " + subject);
             
+            String str = am.getValue("threads");
+            int threads = 1;
+            if (str != null) {
+                threads = Integer.parseInt(str);
+            }
+            
+            // need one source and one destination connection per thread
             DBConfig dbrc = new DBConfig();
             ConnectionConfig syb = dbrc.getConnectionConfig("SYBVAULT", "vospace2");
-            DBUtil.createJNDIDataSource(VOSpaceNodePersistence.DATASOURCE_NAME, syb);
+            DBUtil.PoolConfig sybpool = new DBUtil.PoolConfig(syb, threads, 20000L, "select 123");
+            DBUtil.createJNDIDataSource(VOSpaceNodePersistence.DATASOURCE_NAME, sybpool);
             final DatabaseNodePersistence src = new VOSpaceNodePersistence();
             log.info("source ready: " + syb.getServer() + " " + syb.getDatabase() + "\n");
             
             ConnectionConfig pg = dbrc.getConnectionConfig("PGVAULT", "content");
-            DBUtil.createJNDIDataSource("jdbc/nodes", pg);
+            DBUtil.PoolConfig pgpool = new DBUtil.PoolConfig(pg, threads, 20000L, "select 123");
+            DBUtil.createJNDIDataSource("jdbc/nodes", pgpool);
             DataSource vds = DBUtil.findJNDIDataSource("jdbc/nodes");
             
             log.info("init destination database for inventory: START");
@@ -158,6 +167,7 @@ public class Main {
             mig.setRecursive(recursive);
             mig.setDryrun(am.isSet("dryrun"));
             mig.setNodes(nodes);
+            mig.setThreads(threads);
             try {
                 Subject.doAs(subject, mig);
             } catch (PrivilegedActionException pex) {
@@ -172,7 +182,8 @@ public class Main {
     }
     
     private static void usage() {
-        System.out.println("usage: vault-migrate [options] [--dryrun] [-r|--recursive] <container node> [<container node> ...");
+        System.out.println("usage: vault-migrate [options] [--dryrun] [-r|--recursive] [--threads=<int>] <container node> [<container node> ...");
         System.out.println("options:        [-v|--verbose|-d|--debug]");
+        System.out.println("options:        [--threads=<int>] : number of migrate threads (default: 1)");
     }
 }

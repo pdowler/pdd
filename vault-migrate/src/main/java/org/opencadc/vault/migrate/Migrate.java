@@ -67,7 +67,9 @@
 
 package org.opencadc.vault.migrate;
 
+import ca.nrc.cadc.thread.ThreadedRunnableExecutor;
 import ca.nrc.cadc.vos.ContainerNode;
+import ca.nrc.cadc.vos.NodeProperty;
 import ca.nrc.cadc.vos.VOSURI;
 import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import java.net.URI;
@@ -76,6 +78,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.log4j.Logger;
@@ -98,6 +101,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
     private final List<String> nodes = new ArrayList<>();
     private boolean recursive = false;
     private boolean dryrun = false;
+    private int threads = 1;
     
     public Migrate(DatabaseNodePersistence src, NodePersistenceImpl dest) {
         this.src = src;
@@ -113,6 +117,10 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
         this.recursive = r;
     }
 
+    public void setThreads(int threads) {
+        this.threads = threads;
+    }
+    
     public void setDryrun(boolean dryrun) {
         this.dryrun = dryrun;
     }
@@ -130,116 +138,50 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
         }
         
         long num = 0;
-        SourceNodeIterator iter = null;
+        Map<Long,List<NodeProperty>> propertyCache = null;
         if (recursive) {
-            iter = new SourceNodeIterator(src);
+            propertyCache = SourceNodeIterator.initPropMap();
         }
-        long start = System.currentTimeMillis();
-        long blocked = 0L;
-        long pmin = Long.MAX_VALUE;
-        long pmax = 0L;
-        long ptotal = 0L;
+        LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
         for (ca.nrc.cadc.vos.Node in : srcRoot.getNodes()) {
             src.getProperties(in);
-            num++;
-            System.out.println(num + " " + in.getClass().getSimpleName() + " " + in.getUri().getPath());
             Node nn = conv.convert(in);
-            if (!dryrun) {
-                long t1 = System.nanoTime();
-                dest.put(nn);
-                long pt = System.nanoTime() - t1;
-                ptotal += pt;
-                pmin = Math.min(pmin, pt);
-                pmax = Math.max(pmax, pt);
-            }
-            
+            dest.put(nn);
+            // same log format as used in MigrateWorker
+            log.info(String.format("%d %s %s", num, in.getClass().getSimpleName(), in.getUri().getPath()));
             if (recursive && in instanceof ca.nrc.cadc.vos.ContainerNode) {
                 ca.nrc.cadc.vos.ContainerNode icn = (ca.nrc.cadc.vos.ContainerNode) in;
-                iter.setContainer(icn);
-                LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue = new LinkedBlockingQueue<>(2000);
-                NodeProducer producer = new NodeProducer(iter, queue);
-                final String fmt = "%d %s %s";
-                boolean done = false;
-                while (!done) {
-                    long b1 = System.nanoTime();
-                    ca.nrc.cadc.vos.Node sn = queue.take(); // blocks
-                    blocked += System.nanoTime() - b1;
-                    if (producer.terminate == sn) {
-                        done = true;
-                    } else {
-                        Node out = conv.convert(sn);
-                        num++;
-                        log.info(String.format(fmt, num, sn.getClass().getSimpleName(), sn.getUri().getPath()));
-                        if (!dryrun) {
-                            long t1 = System.nanoTime();
-                            dest.put(out);
-                            long pt = System.nanoTime() - t1;
-                            ptotal += pt;
-                            pmin = Math.min(pmin, pt);
-                            pmax = Math.max(pmax, pt);
-                        }
-                    }
-                }
-                log.info("source-maxRecursionQueueSize: " + iter.maxRecursionQueueSize);
-                log.info("source-timeQuerying: " + iter.timeQuerying + "ms");
-
-                final String blockFmt = "queue-take: %.2f ms";
-                log.info(String.format(blockFmt, ((double) blocked) / 1.0e6));
-
-                if (!dryrun) {
-                    final String putFmt = dest.getClass().getSimpleName() + ".%s: %.2f ms";
-                    log.info(String.format(putFmt, "min-put", ((double) pmin) / 1.0e6));
-                    log.info(String.format(putFmt, "max-put", ((double) pmax) / 1.0e6));
-                    log.info(String.format(putFmt, "total-put", ((double) ptotal) / 1.0e6));
-                }
+                SourceNodeIterator iter = new SourceNodeIterator(src, propertyCache);
+                MigrateJob job = new MigrateJob(iter, dest, icn);
+                queue.put(job);
             }
         }
-        long dt = System.currentTimeMillis() - start;
-        long tpn = dt / num;
-        long sec = dt / 1000L;
-        long rate = 1000 / tpn;
-        log.info("migrated " + num + " nodes in " + dt + "ms (" + sec + "sec) aka ~" + rate + " nodes/sec");
+        log.info("queued top level containers: " + queue.size());
+
+        ThreadedRunnableExecutor threadPool = new ThreadedRunnableExecutor(queue, threads);
+        
+        long poll = 6000L; // 1 round
+        boolean waiting = true;
+        while (waiting) {
+            if (queue.isEmpty()) {
+                // look more closely at state of thread pool
+                if (threadPool.getAllThreadsIdle()) {
+                    log.info("queue empty and threads idle - DONE");
+                    waiting = false;
+                } else {
+                    log.info("queue empty but threads working - Migrate.POLL dt=" + poll);
+                    Thread.sleep(poll);
+                }
+            } else {
+                log.info("queue not empty - FileSync.POLL dt=" + poll);
+                Thread.sleep(poll);
+            }
+
+        }
+        threadPool.terminate();
         
         return null;
     }
 
-    private class NodeProducer implements Runnable {
-        private Iterator<ca.nrc.cadc.vos.Node> inner;
-        private final LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue;
-        ca.nrc.cadc.vos.Node terminate = new TerminateNode();
-
-        public NodeProducer(Iterator<ca.nrc.cadc.vos.Node> inner,LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue) {
-            this.inner = inner;
-            this.queue = queue;
-            Thread bg = new Thread(this);
-            bg.setDaemon(true);
-            bg.start();
-        }
-        
-        @Override
-        public void run() {
-            log.warn("ThreadedNodeIterator.run() START");
-            int num = 0;
-            while (inner.hasNext()) {
-                try {
-                    queue.put(inner.next()); // block at capacity
-                    num++;
-                } catch (InterruptedException ex) {
-                    log.warn("ThreadedNodeIterator.run() interrupted");
-                }
-            }
-            try {
-                queue.put(terminate);
-            } catch (InterruptedException ex) {
-                log.warn("ThreadedNodeIterator.run() interrupted");
-            }
-            log.warn("ThreadedNodeIterator.run() DONE num=" + num);
-        }
-    }
     
-    private class TerminateNode extends ca.nrc.cadc.vos.LinkNode {
-        public TerminateNode() {
-            super(new VOSURI(URI.create("vos://authority~service/terminate")), URI.create("vos:terminate"));
-        }
-    }
 }    
