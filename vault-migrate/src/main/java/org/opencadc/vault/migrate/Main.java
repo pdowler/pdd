@@ -182,8 +182,8 @@ public class Main {
     }
     
     private static void usage() {
-        System.out.println("usage: vault-migrate [options] [--dryrun] [-r|--recursive] [--threads=<int>] <container node> [<container node> ...");
-        System.out.println("options:        [-v|--verbose|-d|--debug]");
-        System.out.println("options:        [--threads=<int>] : number of migrate threads (default: 1)");
+        System.out.println("usage: vault-migrate [options] [--dryrun] [-r|--recursive] <container node> [<container node> ...");
+        System.out.println("        [-v|--verbose|-d|--debug]");
+        System.out.println("        [--threads=<int>] : number of migrate threads (default: 1)");
     }
 }

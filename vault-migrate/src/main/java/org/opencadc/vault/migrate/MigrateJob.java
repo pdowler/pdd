@@ -134,15 +134,19 @@ public class MigrateJob implements Runnable {
                 }
             }
             log.info("summary " + node.getName() + " source-maxRecursionQueueSize: " + src.maxRecursionQueueSize);
-            log.info("summary " + node.getName() + " source-timeQuerying: " + src.timeQuerying + "ms");
+            
 
             if (!dryrun) {
-                final String putFmt = "summary [%s] %s: %.2f ms";
+                final String putFmt = "summary %s %s: %.2f ms";
                 log.info(String.format(putFmt, node.getName(), "min-put", ((double) pmin) / 1.0e6));
                 log.info(String.format(putFmt, node.getName(), "max-put", ((double) pmax) / 1.0e6));
-                long totalPut = ptotal / (1000L * 1000L * 1000L); // sec
-                long rate = num / totalPut;
-                log.info(String.format("summary [%s] count: %d time: %d rate: %d nodes/sec", node.getName(), num, totalPut, rate));
+                long totalPut = ptotal / (1000L * 1000L); // ms
+                long totalTime = System.currentTimeMillis() - start;
+                long rate = (long) (1000L * num / totalTime);
+                log.info(String.format("summary %s count: %d source-query: %d dest-put: %d total-time: %d ms rate: %d nodes/sec", 
+                        node.getName(), num, src.timeQuerying, totalPut, totalTime, rate));
+            } else {
+                log.info("summary " + node.getName() + " source-timeQuerying: " + src.timeQuerying + "ms");
             }
         } catch (InterruptedException ex) {
             log.warn("MigrateWorker terminating: interrupt()");

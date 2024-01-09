@@ -153,6 +153,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
                 ca.nrc.cadc.vos.ContainerNode icn = (ca.nrc.cadc.vos.ContainerNode) in;
                 SourceNodeIterator iter = new SourceNodeIterator(src, propertyCache);
                 MigrateJob job = new MigrateJob(iter, dest, icn);
+                job.dryrun = dryrun;
                 queue.put(job);
             }
         }
