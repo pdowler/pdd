@@ -192,7 +192,7 @@ public class NodeConvert {
                         ret.getReadOnlyGroup().add(g);
                     } catch (URISyntaxException | IllegalArgumentException ex) {
                         log.warn("SKIP: invalid read group identifier: " + s 
-                                + "[owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
+                                + " owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
                     }
                 }
             }
@@ -210,7 +210,7 @@ public class NodeConvert {
                         ret.getReadWriteGroup().add(g);
                     } catch (URISyntaxException | IllegalArgumentException ex) {
                         log.warn("SKIP: invalid write group identifier " + s 
-                                + "[owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
+                                + " owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
                     }
                 }
             }
@@ -229,7 +229,7 @@ public class NodeConvert {
                     ret.getProperties().add(np);
                 } catch (URISyntaxException ex) {
                     log.warn("SKIP: invalid property uri " + ip.getPropertyURI() 
-                            + "[owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
+                            + " owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
                 }
             }
         }
