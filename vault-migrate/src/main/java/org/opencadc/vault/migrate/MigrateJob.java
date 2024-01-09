@@ -140,13 +140,16 @@ public class MigrateJob implements Runnable {
                 final String putFmt = "summary [%s] %s: %.2f ms";
                 log.info(String.format(putFmt, node.getName(), "min-put", ((double) pmin) / 1.0e6));
                 log.info(String.format(putFmt, node.getName(), "max-put", ((double) pmax) / 1.0e6));
-                log.info(String.format(putFmt, node.getName(), "total-put", ((double) ptotal) / 1.0e6));
+                long totalPut = ptotal / (1000L * 1000L * 1000L); // sec
+                long rate = num / totalPut;
+                log.info(String.format("summary [%s] count: %d time: %d rate: %d nodes/sec", node.getName(), num, totalPut, rate));
             }
         } catch (InterruptedException ex) {
             log.warn("MigrateWorker terminating: interrupt()");
-        } catch (NodeNotSupportedException | ParseException | URISyntaxException ex) {
-            log.error("unexpected/bad content: " + ex);
-            log.warn("MigrateWorker[" + node.getName() + "] FAILED at " + curURI);
+        } catch (IllegalArgumentException | URISyntaxException ex) {
+            log.error("FAIL bad content at " + curURI, ex);
+        } catch (Exception ex) {
+            log.error("FAIL unexpected at " + curURI, ex);
         }
     }
 
@@ -165,22 +168,34 @@ public class MigrateJob implements Runnable {
         
         @Override
         public void run() {
-            log.warn("ThreadedNodeIterator.run() START");
+            log.warn("NodeProducer.run() START");
             int num = 0;
+            long t1 = System.currentTimeMillis();
             while (inner.hasNext()) {
                 try {
                     queue.put(inner.next()); // block at capacity
                     num++;
+                    long t2 = System.currentTimeMillis();
+                    long dt = t2 - t1;
+                    if (dt > 120 * 1000L) { // 2 min
+                        int qs = queue.size();
+                        log.info("NodeProducer.summary queueSize=" + qs + " num=" + num);
+                        t1 = t2;
+                    }
                 } catch (InterruptedException ex) {
-                    log.warn("ThreadedNodeIterator.run() interrupted");
+                    log.warn("NodeProducer.run() interrupted");
+                } catch (Exception ex) {
+                    log.error("NodeProducer.run() FAIL", ex);
                 }
             }
             try {
                 queue.put(terminate);
             } catch (InterruptedException ex) {
-                log.warn("ThreadedNodeIterator.run() interrupted");
+                log.warn("NodeProducer.run() terminate interrupted");
+            } catch (Exception ex) {
+                log.error("NodeProducer.run() terminate FAIL", ex);
             }
-            log.warn("ThreadedNodeIterator.run() DONE num=" + num);
+            log.warn("NodeProducer.run() DONE num=" + num);
         }
     }
     

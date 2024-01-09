@@ -186,9 +186,14 @@ public class NodeConvert {
             for (String s : groups) {
                 s = s.replace('#', '?').trim();
                 if (s.length() > 0) {
-                    URI u = new URI(s);
-                    GroupURI g = new GroupURI(u);
-                    ret.getReadOnlyGroup().add(g);
+                    try {
+                        URI u = new URI(s);
+                        GroupURI g = new GroupURI(u);
+                        ret.getReadOnlyGroup().add(g);
+                    } catch (URISyntaxException | IllegalArgumentException ex) {
+                        log.warn("SKIP: invalid read group identifier: " + s 
+                                + "[owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
+                    }
                 }
             }
         }
@@ -199,9 +204,14 @@ public class NodeConvert {
             for (String s : groups) {
                 s = s.replace('#', '?').trim();
                 if (s.length() > 0) {
-                    URI u = new URI(s);
-                    GroupURI g = new GroupURI(u);
-                    ret.getReadWriteGroup().add(g);
+                    try {
+                        URI u = new URI(s);
+                        GroupURI g = new GroupURI(u);
+                        ret.getReadWriteGroup().add(g);
+                    } catch (URISyntaxException | IllegalArgumentException ex) {
+                        log.warn("SKIP: invalid write group identifier " + s 
+                                + "[owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
+                    }
                 }
             }
         }
@@ -218,7 +228,8 @@ public class NodeConvert {
                     NodeProperty np = new NodeProperty(new URI(ip.getPropertyURI()), ip.getPropertyValue());
                     ret.getProperties().add(np);
                 } catch (URISyntaxException ex) {
-                    log.warn("invalid property uri " + ip.getPropertyURI() + " in " + in.getUri().getURI().toASCIIString());
+                    log.warn("SKIP: invalid property uri " + ip.getPropertyURI() 
+                            + "[owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
                 }
             }
         }

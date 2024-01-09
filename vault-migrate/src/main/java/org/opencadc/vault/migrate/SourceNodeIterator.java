@@ -203,7 +203,16 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
         throw new UnsupportedOperationException();
     }
     
+    // this impl avoids recusrion in favour of a loop
     private void advance() {
+        boolean adv = advanceLoop();
+        while (!adv) {
+            adv = advanceLoop();
+        }
+    }
+    
+    // avoid recursion: return true when advanced
+    private boolean advanceLoop() {
         // shift to next node in batch
         if (!batch.isEmpty()) {
             curNode = batch.pop();
@@ -212,7 +221,7 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
                 recursionQueue.push((ContainerNode) curNode);
                 maxRecursionQueueSize = Math.max(maxRecursionQueueSize, recursionQueue.size());
             }
-            return;
+            return true;
         }
         
         if (!lastBatchPartial) {
@@ -248,7 +257,7 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
                     recursionQueue.push((ContainerNode) curNode);
                     maxRecursionQueueSize = Math.max(maxRecursionQueueSize, recursionQueue.size());
                 }
-                return;
+                return true;
             }
         } else {
             log.debug("avoided extra query for last node in container " + curParent.getUri());
@@ -264,7 +273,9 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
             log.debug("recursionQueue.pop: " + curParent.getUri());
         }
         if (curParent != null) {
-            advance();
+            // new parent but avoid recursion
+            return false;
         }
+        return true; // done
     }
 }

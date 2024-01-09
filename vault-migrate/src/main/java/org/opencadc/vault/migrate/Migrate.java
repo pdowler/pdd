@@ -160,7 +160,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
 
         ThreadedRunnableExecutor threadPool = new ThreadedRunnableExecutor(queue, threads);
         
-        long poll = 6000L; // 1 round
+        long poll = 18000L; // 3 rounds
         boolean waiting = true;
         while (waiting) {
             if (queue.isEmpty()) {
