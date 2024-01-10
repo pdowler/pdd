@@ -74,6 +74,7 @@ import ca.nrc.cadc.vos.NodeProperty;
 import ca.nrc.cadc.vos.VOSURI;
 import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import ca.nrc.cadc.vospace.VOSpaceNodePersistence;
+import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -244,7 +245,7 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
             if (!batch.isEmpty()) {
                 curNode = batch.pop();
                 if (curNode.getUri().equals(vuri)) {
-                    log.warn("advance: skip dupicate " + vuri);
+                    log.debug("advance: skip dupicate " + vuri);
                     curNode = null;
                     if (!batch.isEmpty()) {
                         curNode = batch.pop();

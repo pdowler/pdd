@@ -140,6 +140,7 @@ public class MigrateJob implements Runnable {
                 final String putFmt = "summary %s %s: %.2f ms";
                 log.info(String.format(putFmt, node.getName(), "min-put", ((double) pmin) / 1.0e6));
                 log.info(String.format(putFmt, node.getName(), "max-put", ((double) pmax) / 1.0e6));
+                log.info(String.format(putFmt, node.getName(), "avg-put", ((double) ptotal) / (num * 1.0e6)));
                 long totalPut = ptotal / (1000L * 1000L); // ms
                 long totalTime = System.currentTimeMillis() - start;
                 long rate = (long) (1000L * num / totalTime);
