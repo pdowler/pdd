@@ -129,38 +129,58 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
     public Void run() throws Exception {
         // careful in root container
         ca.nrc.cadc.vos.ContainerNode srcRoot = (ca.nrc.cadc.vos.ContainerNode) src.get(SRCROOT);
+        List<ca.nrc.cadc.vos.Node> targets = new ArrayList<>();
         if (nodes.isEmpty()) {
             src.getChildren(srcRoot);
+            targets.addAll(srcRoot.getNodes());
         } else {
             for (String name : nodes) {
-                src.getChild(srcRoot, name);
+                String[] path = name.split("/");
+                log.debug("path length: " + path.length);
+                ca.nrc.cadc.vos.ContainerNode cur = srcRoot;
+                ca.nrc.cadc.vos.Node child = null;
+                for (String n : path) {
+                    if (!n.isEmpty()) { // leading / causes blank
+                        src.getChild(cur, n);
+                        child = cur.getNodes().get(0);
+                        log.debug("found " + n + " = " + child.getUri());
+                        if (child instanceof ca.nrc.cadc.vos.ContainerNode) {
+                            cur = (ca.nrc.cadc.vos.ContainerNode) child;
+                        }
+                    }
+                }
+                log.info("target: " + name + " -> " + child.getClass().getSimpleName() + " " + child.getUri());
+                targets.add(child);
+                srcRoot.getNodes().clear();
             }
         }
+        log.info("target nodes: " + targets.size() + "\n");
         
-        long num = 0;
-        Map<Long,List<NodeProperty>> propertyCache = null;
-        if (recursive) {
-            propertyCache = SourceNodeIterator.initPropMap();
-        }
+        Map<Long,List<NodeProperty>> propertyCache = null; // lazy init
         LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
-        for (ca.nrc.cadc.vos.Node in : srcRoot.getNodes()) {
+        int num = 0;
+        for (ca.nrc.cadc.vos.Node in : targets) {
             src.getProperties(in);
             Node nn = conv.convert(in);
             dest.put(nn);
-            // same log format as used in MigrateWorker
-            log.info(String.format("%d %s %s", num, in.getClass().getSimpleName(), in.getUri().getPath()));
             if (recursive && in instanceof ca.nrc.cadc.vos.ContainerNode) {
+                if (propertyCache == null) {
+                    propertyCache = SourceNodeIterator.initPropMap();
+                }
                 ca.nrc.cadc.vos.ContainerNode icn = (ca.nrc.cadc.vos.ContainerNode) in;
                 SourceNodeIterator iter = new SourceNodeIterator(src, propertyCache);
                 MigrateJob job = new MigrateJob(iter, dest, icn);
                 job.dryrun = dryrun;
                 queue.put(job);
             }
+            // same log format as used in MigrateWorker
+            log.info(String.format("%d %s %s", ++num, in.getClass().getSimpleName(), in.getUri().getPath()));
         }
-        log.info("queued top level containers: " + queue.size());
+        log.info("target containers: " + queue.size());
 
         ThreadedRunnableExecutor threadPool = new ThreadedRunnableExecutor(queue, threads);
-        
+        log.info("migrate threads: " + threads);
+
         long poll = 18000L; // 3 rounds
         boolean waiting = true;
         while (waiting) {

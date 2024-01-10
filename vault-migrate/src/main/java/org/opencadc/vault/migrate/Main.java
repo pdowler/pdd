@@ -183,6 +183,7 @@ public class Main {
     
     private static void usage() {
         System.out.println("usage: vault-migrate [options] [--dryrun] [-r|--recursive] <container node> [<container node> ...");
+        System.out.println("        <container node> : a node path; normally a top-level node name but can be a child node");
         System.out.println("        [-v|--verbose|-d|--debug]");
         System.out.println("        [--threads=<int>] : number of migrate threads (default: 1)");
     }
