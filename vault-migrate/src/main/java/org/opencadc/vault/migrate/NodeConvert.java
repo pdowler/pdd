@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2023.                            (c) 2023.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -68,7 +68,6 @@
 package org.opencadc.vault.migrate;
 
 import ca.nrc.cadc.date.DateUtil;
-import ca.nrc.cadc.vos.VOS;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.DateFormat;
@@ -85,36 +84,34 @@ import org.opencadc.vospace.DataNode;
 import org.opencadc.vospace.LinkNode;
 import org.opencadc.vospace.Node;
 import org.opencadc.vospace.NodeProperty;
-import org.opencadc.vospace.VOSURI;
+import org.opencadc.vospace.VOS;
 
 /**
- *
+ * Convert a ca.nrc.cadc.vos.Node to an org.opencadc.vospace.Node instance.
+ * 
  * @author pdowler
  */
 public class NodeConvert {
     private static final Logger log = Logger.getLogger(NodeConvert.class);
 
     // list of props with special handling that are ignored if seen in the node.properties
-    private static List<String> IGNORE_PROPS = Arrays.asList(new String[] {
+    private static final List<String> IGNORE_PROPS = Arrays.asList(new String[] {
         
-        VOS.PROPERTY_URI_CONTENTENCODING, // artifact.contentEncoding
-        VOS.PROPERTY_URI_CONTENTLENGTH, // artifact.contentLength
-        VOS.PROPERTY_URI_CONTENTMD5, // artifact.contentChecksum
-        VOS.PROPERTY_URI_TYPE, // artifact.contentType
-        VOS.PROPERTY_URI_CREATION_DATE, // not exposed by src, no where to put it in v2
-        VOS.PROPERTY_URI_CREATOR, // node.ownerID
-        VOS.PROPERTY_URI_DATE, // node.lastModified
-        VOS.PROPERTY_URI_FORMAT, // ??
-        VOS.PROPERTY_URI_GROUPMASK, // obsolete
-        VOS.PROPERTY_URI_GROUPREAD, // node
-        VOS.PROPERTY_URI_GROUPWRITE, // node
-        VOS.PROPERTY_URI_ISLOCKED, // node
-        VOS.PROPERTY_URI_ISPUBLIC, // node
-        VOS.PROPERTY_URI_READABLE, // dynamic
-        VOS.PROPERTY_URI_WRITABLE, // dynamic
-        
-        VOS.PROPERTY_URI_AVAILABLESPACE, // computed internally
-        VOS.PROPERTY_URI_QUOTA, // manually set later??
+        VOS.PROPERTY_URI_CONTENTENCODING.toASCIIString(), // artifact.contentEncoding
+        VOS.PROPERTY_URI_CONTENTLENGTH.toASCIIString(), // artifact.contentLength
+        VOS.PROPERTY_URI_CONTENTMD5.toASCIIString(), // artifact.contentChecksum
+        VOS.PROPERTY_URI_TYPE.toASCIIString(), // artifact.contentType
+        VOS.PROPERTY_URI_CREATION_DATE.toASCIIString(), // not exposed by src, no where to put it in v2
+        VOS.PROPERTY_URI_CREATOR.toASCIIString(), // node.ownerID
+        VOS.PROPERTY_URI_DATE.toASCIIString(), // node.lastModified
+        VOS.PROPERTY_URI_FORMAT.toASCIIString(), // artifact.contentType??
+        VOS.PROPERTY_URI_GROUPREAD.toASCIIString(), // node
+        VOS.PROPERTY_URI_GROUPWRITE.toASCIIString(), // node
+        VOS.PROPERTY_URI_ISLOCKED.toASCIIString(), // node
+        VOS.PROPERTY_URI_ISPUBLIC.toASCIIString(), // node
+        VOS.PROPERTY_URI_READABLE.toASCIIString(), // dynamic
+        VOS.PROPERTY_URI_WRITABLE.toASCIIString(), // dynamic
+        VOS.PROPERTY_URI_AVAILABLESPACE.toASCIIString() // computed
     });
     
     private final UUID rootID;
@@ -225,11 +222,34 @@ public class NodeConvert {
         for (ca.nrc.cadc.vos.NodeProperty ip : in.getProperties()) {
             if (!IGNORE_PROPS.contains(ip.getPropertyURI())) {
                 try {
-                    NodeProperty np = new NodeProperty(new URI(ip.getPropertyURI()), ip.getPropertyValue());
+                    URI key = new URI(ip.getPropertyURI());
+                    // allow ivo, http, and https schemes only
+                    if (key.getScheme() == null) {
+                        throw new URISyntaxException("invalid structure: no scheme", ip.getPropertyURI());
+                    }
+                    if (!key.getScheme().equals("ivo") && !key.getScheme().equals("http") && !key.getScheme().equals("https")) {
+                        throw new URISyntaxException("invalid structure: unknown scheme", ip.getPropertyURI());
+                    }
+                    if (key.getAuthority() == null) {
+                        throw new URISyntaxException("invalid structure: no authority", ip.getPropertyURI());
+                    }
+                    if (key.getPath() == null) {
+                        throw new URISyntaxException("invalid structure: no path", ip.getPropertyURI());
+                    }
+                    if (key.getFragment() == null) {
+                        throw new URISyntaxException("invalid structure: no fragment", ip.getPropertyURI());
+                    }
+                    if (key.toASCIIString().startsWith(VOS.VOSPACE_URI_NAMESPACE)) {
+                        if (!VOS.VOSPACE_CORE_PROPERTIES.contains(key)) {
+                            throw new URISyntaxException("unrecognized property URI in vospace namespace", key.toASCIIString());
+                        }
+                    }
+                    NodeProperty np = new NodeProperty(key, ip.getPropertyValue());
                     ret.getProperties().add(np);
                 } catch (URISyntaxException ex) {
                     log.warn("SKIP: invalid property uri " + ip.getPropertyURI() 
-                            + " owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString());
+                            + " owner: " + ret.ownerID + " node: " + in.getUri().getURI().toASCIIString()
+                            + " reason: " + ex.getMessage());
                 }
             }
         }

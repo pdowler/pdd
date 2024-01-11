@@ -3,7 +3,7 @@
 *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
 **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
 *
-*  (c) 2023.                            (c) 2023.
+*  (c) 2024.                            (c) 2024.
 *  Government of Canada                 Gouvernement du Canada
 *  National Research Council            Conseil national de recherches
 *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -68,18 +68,12 @@
 package org.opencadc.vault.migrate;
 
 import ca.nrc.cadc.thread.ThreadedRunnableExecutor;
-import ca.nrc.cadc.vos.ContainerNode;
-import ca.nrc.cadc.vos.NodeProperty;
-import ca.nrc.cadc.vos.VOSURI;
 import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.log4j.Logger;
 import org.opencadc.vault.NodePersistenceImpl;
@@ -156,7 +150,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
         }
         log.info("target nodes: " + targets.size() + "\n");
         
-        Map<Long,List<NodeProperty>> propertyCache = null; // lazy init
+        Map<Long,List<ca.nrc.cadc.vos.NodeProperty>> propertyCache = null; // lazy init
         LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
         int num = 0;
         for (ca.nrc.cadc.vos.Node in : targets) {

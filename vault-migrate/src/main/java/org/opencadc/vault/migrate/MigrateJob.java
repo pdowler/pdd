@@ -70,13 +70,11 @@ package org.opencadc.vault.migrate;
 import ca.nrc.cadc.vos.VOSURI;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.text.ParseException;
 import java.util.Iterator;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.log4j.Logger;
 import org.opencadc.vault.NodePersistenceImpl;
 import org.opencadc.vospace.Node;
-import org.opencadc.vospace.NodeNotSupportedException;
 
 /**
  * Job to migrate a single container node (recursive).
