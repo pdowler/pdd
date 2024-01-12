@@ -100,8 +100,8 @@ public class NodeConvert {
         VOS.PROPERTY_URI_CONTENTENCODING.toASCIIString(), // artifact.contentEncoding
         VOS.PROPERTY_URI_CONTENTLENGTH.toASCIIString(), // artifact.contentLength
         VOS.PROPERTY_URI_CONTENTMD5.toASCIIString(), // artifact.contentChecksum
-        VOS.PROPERTY_URI_TYPE.toASCIIString(), // artifact.contentType
-        VOS.PROPERTY_URI_CREATION_DATE.toASCIIString(), // not exposed by src, no where to put it in v2
+        VOS.PROPERTY_URI_TYPE.toASCIIString(), // artifact.contentType??
+        VOS.PROPERTY_URI_CONTENTDATE.toASCIIString(), // artifact.contentLastModified
         VOS.PROPERTY_URI_CREATOR.toASCIIString(), // node.ownerID
         VOS.PROPERTY_URI_DATE.toASCIIString(), // node.lastModified
         VOS.PROPERTY_URI_FORMAT.toASCIIString(), // artifact.contentType??
