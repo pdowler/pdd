@@ -151,10 +151,12 @@ public class Main {
             DBUtil.createJNDIDataSource("jdbc/nodes", pgpool);
             DataSource vds = DBUtil.findJNDIDataSource("jdbc/nodes");
             
+            // TODOL: skip for production?
             log.info("init destination database for inventory: START");
             InitDatabaseSI si = new InitDatabaseSI(vds, null, "inventory");
             si.doInit();
             log.info("init database for inventory: OK");
+
             log.info("init database for vospace: START");
             InitDatabaseVOS vs = new InitDatabaseVOS(vds, null, "vospace");
             vs.doInit();
