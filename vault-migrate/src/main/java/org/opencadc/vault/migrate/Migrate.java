@@ -130,16 +130,20 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
         } else {
             for (String name : nodes) {
                 String[] path = name.split("/");
-                log.debug("path length: " + path.length);
+                log.warn("path " + name + " length: " + path.length);
                 ca.nrc.cadc.vos.ContainerNode cur = srcRoot;
                 ca.nrc.cadc.vos.Node child = null;
                 for (String n : path) {
                     if (!n.isEmpty()) { // leading / causes blank
                         src.getChild(cur, n);
-                        child = cur.getNodes().get(0);
-                        log.debug("found " + n + " = " + child.getUri());
-                        if (child instanceof ca.nrc.cadc.vos.ContainerNode) {
-                            cur = (ca.nrc.cadc.vos.ContainerNode) child;
+                        if (cur.getNodes().isEmpty()) {
+                            log.warn("not found: " + n + " from " + name);
+                        } else {
+                            child = cur.getNodes().get(0);
+                            log.debug("found " + n + " = " + child.getUri());
+                            if (child instanceof ca.nrc.cadc.vos.ContainerNode) {
+                                cur = (ca.nrc.cadc.vos.ContainerNode) child;
+                            }
                         }
                     }
                 }

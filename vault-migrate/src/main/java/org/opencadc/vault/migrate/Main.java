@@ -85,7 +85,7 @@ import javax.security.auth.Subject;
 import javax.sql.DataSource;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.opencadc.inventory.db.version.InitDatabase;
+import org.opencadc.inventory.db.version.InitDatabaseSI;
 import org.opencadc.vault.NodePersistenceImpl;
 import org.opencadc.vospace.db.InitDatabaseVOS;
 
@@ -152,7 +152,7 @@ public class Main {
             DataSource vds = DBUtil.findJNDIDataSource("jdbc/nodes");
             
             log.info("init destination database for inventory: START");
-            InitDatabase si = new InitDatabase(vds, null, "inventory");
+            InitDatabaseSI si = new InitDatabaseSI(vds, null, "inventory");
             si.doInit();
             log.info("init database for inventory: OK");
             log.info("init database for vospace: START");
