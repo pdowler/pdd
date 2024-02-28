@@ -81,8 +81,8 @@ import org.opencadc.vospace.Node;
  * 
  * @author pdowler
  */
-public class MigrateJob implements Runnable {
-    private static final Logger log = Logger.getLogger(MigrateJob.class);
+public class MigrateNodesTask implements Runnable {
+    private static final Logger log = Logger.getLogger(MigrateNodesTask.class);
 
     private final SourceNodeIterator src;
     private final NodePersistenceImpl dest;
@@ -90,7 +90,7 @@ public class MigrateJob implements Runnable {
     
     boolean dryrun = false;
     
-    public MigrateJob(SourceNodeIterator src, NodePersistenceImpl dest, ca.nrc.cadc.vos.ContainerNode node) {
+    public MigrateNodesTask(SourceNodeIterator src, NodePersistenceImpl dest, ca.nrc.cadc.vos.ContainerNode node) {
         this.src = src;
         this.dest = dest;
         this.node = node;

@@ -139,6 +139,13 @@ public class NodeConvert {
             copyCommon(nid, in, ret);
             ret.busy = false;
             ret.storageID = URI.create("cadc:vault/" + nid.storageID);
+            
+            String raw = in.getPropertyValue(ca.nrc.cadc.vos.VOS.PROPERTY_URI_CONTENTLENGTH);
+            try {
+                ret.bytesUsed = Long.valueOf(raw);
+            } catch (NumberFormatException ex) {
+                log.warn("invalid content-length: " + raw + " in " + in.getUri().getPath());
+            }
             return ret;
         }
         

@@ -95,6 +95,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
     private final List<String> nodes = new ArrayList<>();
     private boolean recursive = false;
     private boolean dryrun = false;
+    private boolean deletions = true;
     private int threads = 1;
     
     public Migrate(DatabaseNodePersistence src, NodePersistenceImpl dest) {
@@ -152,34 +153,42 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
                 srcRoot.getNodes().clear();
             }
         }
-        log.info("target nodes: " + targets.size() + "\n");
+        log.info("target nodes: " + targets.size());
         
-        Map<Long,List<ca.nrc.cadc.vos.NodeProperty>> propertyCache = null; // lazy init
         LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
+        if (deletions) {
+            MigrateDeletionsTask job = new MigrateDeletionsTask(dest);
+            job.dryrun = dryrun;
+            queue.put(job);
+        }
+        
         int num = 0;
+        Map<Long,List<ca.nrc.cadc.vos.NodeProperty>> propertyCache = null; // lazy init
         for (ca.nrc.cadc.vos.Node in : targets) {
             src.getProperties(in);
             Node nn = conv.convert(in);
-            dest.put(nn);
+            if (!dryrun) {
+                dest.put(nn);
+            }
             if (recursive && in instanceof ca.nrc.cadc.vos.ContainerNode) {
                 if (propertyCache == null) {
                     propertyCache = SourceNodeIterator.initPropMap();
                 }
                 ca.nrc.cadc.vos.ContainerNode icn = (ca.nrc.cadc.vos.ContainerNode) in;
                 SourceNodeIterator iter = new SourceNodeIterator(src, propertyCache);
-                MigrateJob job = new MigrateJob(iter, dest, icn);
+                MigrateNodesTask job = new MigrateNodesTask(iter, dest, icn);
                 job.dryrun = dryrun;
                 queue.put(job);
             }
             // same log format as used in MigrateWorker
             log.info(String.format("%d %s %s", ++num, in.getClass().getSimpleName(), in.getUri().getPath()));
         }
-        log.info("target containers: " + queue.size());
+        log.info("migrate jobs: " + queue.size());
 
         ThreadedRunnableExecutor threadPool = new ThreadedRunnableExecutor(queue, threads);
         log.info("migrate threads: " + threads);
 
-        long poll = 18000L; // 3 rounds
+        long poll = 12000L; // 2 rounds
         boolean waiting = true;
         while (waiting) {
             if (queue.isEmpty()) {
@@ -188,11 +197,11 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
                     log.info("queue empty and threads idle - DONE");
                     waiting = false;
                 } else {
-                    log.info("queue empty but threads working - Migrate.POLL dt=" + poll);
+                    log.debug("queue empty but threads working - Migrate.POLL dt=" + poll);
                     Thread.sleep(poll);
                 }
             } else {
-                log.info("queue not empty - FileSync.POLL dt=" + poll);
+                log.debug("queue not empty - FileSync.POLL dt=" + poll);
                 Thread.sleep(poll);
             }
 

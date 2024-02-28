@@ -30,7 +30,7 @@ dependencies {
     compile 'org.opencadc:cadc-util:[1.10.6,2.0)'
 
     // destination
-    compile 'org.opencadc:cadc-vos:[2.0,)'
+    compile 'org.opencadc:cadc-vos:[2.0.5,)'
     compile 'org.opencadc:cadc-vos-server:[2.0,)'
     compile 'org.opencadc:vault:0.1'
 
