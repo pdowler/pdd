@@ -95,7 +95,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
     private final List<String> nodes = new ArrayList<>();
     private boolean recursive = false;
     private boolean dryrun = false;
-    private boolean deletions = true;
+    private boolean deletions = false;
     private int threads = 1;
     
     public Migrate(DatabaseNodePersistence src, NodePersistenceImpl dest) {
@@ -120,8 +120,19 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
         this.dryrun = dryrun;
     }
 
+    public void setDeletions(boolean deletions) {
+        this.deletions = deletions;
+    }
+
     @Override
     public Void run() throws Exception {
+        if (deletions) {
+            MigrateDeletionsTask job = new MigrateDeletionsTask(dest);
+            job.dryrun = dryrun;
+            job.run();
+            return null;
+        }
+
         // careful in root container
         ca.nrc.cadc.vos.ContainerNode srcRoot = (ca.nrc.cadc.vos.ContainerNode) src.get(SRCROOT);
         List<ca.nrc.cadc.vos.Node> targets = new ArrayList<>();
@@ -155,13 +166,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
         }
         log.info("target nodes: " + targets.size());
         
-        LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
-        if (deletions) {
-            MigrateDeletionsTask job = new MigrateDeletionsTask(dest);
-            job.dryrun = dryrun;
-            queue.put(job);
-        }
-        
+        final LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
         int num = 0;
         Map<Long,List<ca.nrc.cadc.vos.NodeProperty>> propertyCache = null; // lazy init
         for (ca.nrc.cadc.vos.Node in : targets) {

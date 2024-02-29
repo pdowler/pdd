@@ -105,13 +105,15 @@ public class SourceDeletedNodeEventIterator implements ResourceIterator<DeletedN
     private int batchSize = 1000;
     private Iterator<DeletedNodeEvent> batch;
     private Date curLastModified;
+    private UUID curID;
     
     private final DNEMapper rowMapper = new DNEMapper();
     private final Calendar utc = Calendar.getInstance(DateUtil.UTC);
     
-    public SourceDeletedNodeEventIterator(Date minLastModified) {
-        this.curLastModified = minLastModified;
-        advance(null);
+    public SourceDeletedNodeEventIterator(Date curLastModified, UUID curID) {
+        this.curLastModified = curLastModified;
+        this.curID = curID;
+        advance();
     }
 
     @Override
@@ -123,12 +125,13 @@ public class SourceDeletedNodeEventIterator implements ResourceIterator<DeletedN
     public DeletedNodeEvent next() {
         DeletedNodeEvent ret = batch.next();
         curLastModified = ret.getLastModified();
-        advance(ret.getID());
+        curID = ret.getID();
+        advance();
         
         return ret;
     }
     
-    private void advance(UUID curID) {
+    private void advance() {
         // cal from ctor or next
         if (batch == null || !batch.hasNext()) {
             this.batch = null;

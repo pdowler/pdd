@@ -162,6 +162,7 @@ public class Main {
             
             Migrate mig = new Migrate(src, dest);
             mig.setRecursive(recursive);
+            mig.setDeletions(am.isSet("deletions"));
             mig.setDryrun(am.isSet("dryrun"));
             mig.setNodes(nodes);
             mig.setThreads(threads);

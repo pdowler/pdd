@@ -105,7 +105,7 @@ public class MigrateDeletionsTask implements Runnable {
         HarvestState state = dao.get("migrate-deletions", URI.create("db:sybase:vopspace2"));
         
         log.info("START");
-        try (SourceDeletedNodeEventIterator iter = new SourceDeletedNodeEventIterator(state.curLastModified)) {
+        try (SourceDeletedNodeEventIterator iter = new SourceDeletedNodeEventIterator(state.curLastModified, state.curID)) {
             while (iter.hasNext()) {
                 DeletedNodeEvent dae = iter.next();
                 log.info("delete: " + dae.getNodeType() + " " + dae.getID() + " " + df.format(dae.getLastModified()));
