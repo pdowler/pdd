@@ -105,6 +105,8 @@ public class MigrateDeletionsTask implements Runnable {
         HarvestState state = dao.get("migrate-deletions", URI.create("db:sybase:vopspace2"));
         
         log.info("START");
+        long num = 0;
+        long start = System.currentTimeMillis();
         try (SourceDeletedNodeEventIterator iter = new SourceDeletedNodeEventIterator(state.curLastModified, state.curID)) {
             while (iter.hasNext()) {
                 DeletedNodeEvent dae = iter.next();
@@ -116,12 +118,15 @@ public class MigrateDeletionsTask implements Runnable {
                     nodeDAO.delete(dae.getID());
                     dao.put(state);
                 }
+                num++;
             }
         } catch (Exception ex) {
             log.error("FAIL", ex);
         } finally {
             dao.flushBufferedState();
-            log.info("DONE");
+            long dt = System.currentTimeMillis() - start;
+            dt = dt / 1000L;
+            log.info("DONE num=" + num + " dt="+dt + "sec");
         }
     }
 }

@@ -142,7 +142,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
         } else {
             for (String name : nodes) {
                 String[] path = name.split("/");
-                log.warn("path " + name + " length: " + path.length);
+                log.debug("path " + name + " length: " + path.length);
                 ca.nrc.cadc.vos.ContainerNode cur = srcRoot;
                 ca.nrc.cadc.vos.Node child = null;
                 for (String n : path) {

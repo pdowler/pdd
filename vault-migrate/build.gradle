@@ -44,5 +44,6 @@ dependencies {
 }
 configurations {
     // pulled in by vospace-lib and don't want to rebuild locally
+    compile.exclude group: 'org.opencadc', module: 'cadc-vos-server-db'
     runtime.exclude group: 'org.opencadc', module: 'cadc-vos-server-db'
 }

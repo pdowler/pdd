@@ -67,6 +67,7 @@
 
 package org.opencadc.vault.migrate;
 
+import ca.nrc.cadc.date.DateUtil;
 import ca.nrc.cadc.db.DBUtil;
 import ca.nrc.cadc.vos.ContainerNode;
 import ca.nrc.cadc.vos.Node;
@@ -74,9 +75,10 @@ import ca.nrc.cadc.vos.NodeProperty;
 import ca.nrc.cadc.vos.VOSURI;
 import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import ca.nrc.cadc.vospace.VOSpaceNodePersistence;
-import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.DateFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -114,6 +116,18 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
     public SourceNodeIterator(DatabaseNodePersistence nodePer, Map<Long,List<NodeProperty>> propMap) {
         this.nodePer = nodePer;
         this.propMap = propMap;
+        
+        
+        try {
+            // hard coded incremental listing hack
+            String startDate = null; // "2024-02-01T00:00:00.000";
+            if (startDate != null) {
+                DateFormat df = DateUtil.getDateFormat(DateUtil.IVOA_DATE_FORMAT, DateUtil.UTC);
+                ca.nrc.cadc.vos.server.db.NodeDAO.INCREMENTAL_HACK = df.parse(startDate);
+            }
+        } catch (ParseException ex) {
+            throw new RuntimeException("BUG: invalid hard-coded INCREMENTAL_HACK", ex);
+        }
     }
     
     public void setContainer(ContainerNode curParent) {
