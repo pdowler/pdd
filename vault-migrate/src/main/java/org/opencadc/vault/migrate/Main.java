@@ -126,8 +126,16 @@ public class Main {
             }
             
             // local config
+            File altHomeDir = new File("servops");
+            if (altHomeDir.exists() && altHomeDir.isDirectory()) {
+                System.setProperty("user.home", altHomeDir.getAbsolutePath());
+            } else {
+                log.error("not found: servops (alt home dir)");
+                System.exit(-1);
+            }
             System.setProperty(IdentityManager.class.getName(), ACIdentityManager.class.getName());
-            System.setProperty("user.home", "servops");
+            
+            log.info("alt home dir: " + System.getProperty("user.home"));
             File cert = new File(System.getProperty("user.home") + "/.ssl/cadcproxy.pem");
             Subject subject = SSLUtil.createSubject(cert);
             log.info("running as: " + subject);
@@ -146,7 +154,7 @@ public class Main {
             final DatabaseNodePersistence src = new VOSpaceNodePersistence();
             log.info("source ready: " + syb.getServer() + " " + syb.getDatabase() + "\n");
             
-            ConnectionConfig pg = dbrc.getConnectionConfig("PGVAULT", "content");
+            ConnectionConfig pg = dbrc.getConnectionConfig("PGVAULT", am.getValue("pgdb"));
             DBUtil.PoolConfig pgpool = new DBUtil.PoolConfig(pg, threads, 20000L, "select 123");
             DBUtil.createJNDIDataSource("jdbc/nodes", pgpool);
             DataSource vds = DBUtil.findJNDIDataSource("jdbc/nodes");
@@ -180,7 +188,7 @@ public class Main {
     }
     
     private static void usage() {
-        System.out.println("usage: vault-migrate [options] [--dryrun] ...");
+        System.out.println("usage: vault-migrate --pgdb=<destination database name> [options] [--dryrun] ...");
         System.out.println("        --recursive <container node> [<container node> ...] : migrate specified nodes");
         System.out.println("        --deletions : process DeletedNodeEvent(s) from source");
         System.out.println("options:");
