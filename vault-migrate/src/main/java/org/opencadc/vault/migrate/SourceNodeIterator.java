@@ -111,7 +111,6 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
     private final Map<Long,List<NodeProperty>> propMap;
     int maxRecursionQueueSize = 0;
     long timeQuerying = 0L;
-    private boolean firstBatch = true;
     
     public SourceNodeIterator(DatabaseNodePersistence nodePer, Map<Long,List<NodeProperty>> propMap) {
         this.nodePer = nodePer;
@@ -137,6 +136,7 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
         this.lastBatchPartial = false;
         batch.clear();          
         recursionQueue.clear();
+        advance();
     }
     
     static final Map<Long,List<NodeProperty>> initPropMap() {
@@ -186,20 +186,11 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
     
     @Override
     public boolean hasNext() {
-        if (firstBatch) {
-            advance();
-            firstBatch = false;
-        }
         return curNode != null;
     }
 
     @Override
     public Node next() {
-        if (firstBatch) {
-            advance();
-            firstBatch = false;
-        }
-        
         if (curNode == null) {
             throw new NoSuchElementException();
         }
@@ -247,7 +238,6 @@ public class SourceNodeIterator implements Iterator<ca.nrc.cadc.vos.Node> {
             }
             
             log.debug("advance: query " + curParent.getUri() + " from " + vuri);
-            // TODO: make batch a blocking queue and move src query to a separate thread?
             long start = System.currentTimeMillis();
             nodePer.getChildren(curParent, vuri, 1000);
             this.timeQuerying += System.currentTimeMillis() - start;

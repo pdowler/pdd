@@ -85,6 +85,7 @@ import org.opencadc.vospace.LinkNode;
 import org.opencadc.vospace.Node;
 import org.opencadc.vospace.NodeProperty;
 import org.opencadc.vospace.VOS;
+import org.opencadc.vospace.server.Utils;
 
 /**
  * Convert a ca.nrc.cadc.vos.Node to an org.opencadc.vospace.Node instance.
@@ -229,28 +230,8 @@ public class NodeConvert {
         for (ca.nrc.cadc.vos.NodeProperty ip : in.getProperties()) {
             if (!IGNORE_PROPS.contains(ip.getPropertyURI())) {
                 try {
-                    URI key = new URI(ip.getPropertyURI());
-                    // allow ivo, http, and https schemes only
-                    if (key.getScheme() == null) {
-                        throw new URISyntaxException("invalid structure: no scheme", ip.getPropertyURI());
-                    }
-                    if (!key.getScheme().equals("ivo") && !key.getScheme().equals("http") && !key.getScheme().equals("https")) {
-                        throw new URISyntaxException("invalid structure: unknown scheme", ip.getPropertyURI());
-                    }
-                    if (key.getAuthority() == null) {
-                        throw new URISyntaxException("invalid structure: no authority", ip.getPropertyURI());
-                    }
-                    if (key.getPath() == null) {
-                        throw new URISyntaxException("invalid structure: no path", ip.getPropertyURI());
-                    }
-                    if (key.getFragment() == null) {
-                        throw new URISyntaxException("invalid structure: no fragment", ip.getPropertyURI());
-                    }
-                    if (key.toASCIIString().startsWith(VOS.VOSPACE_URI_NAMESPACE)) {
-                        if (!VOS.VOSPACE_CORE_PROPERTIES.contains(key)) {
-                            throw new URISyntaxException("unrecognized property URI in vospace namespace", key.toASCIIString());
-                        }
-                    }
+                    URI key = new URI(ip.getPropertyURI().trim());
+                    Utils.validatePropertyKey(key);
                     NodeProperty np = new NodeProperty(key, ip.getPropertyValue());
                     ret.getProperties().add(np);
                 } catch (URISyntaxException ex) {

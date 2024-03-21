@@ -81,6 +81,7 @@ import java.io.File;
 import java.net.URI;
 import java.security.PrivilegedActionException;
 import java.util.List;
+import java.util.UUID;
 import javax.security.auth.Subject;
 import javax.sql.DataSource;
 import org.apache.log4j.Level;
@@ -164,7 +165,7 @@ public class Main {
             vs.doInit();
             log.info("init database for vospace: OK");
             
-            final NodePersistenceImpl dest = new NodePersistenceImpl(URI.create("ivo://cadc.nrc.ca/vault"));
+            final NodePersistenceImpl dest = new NodePersistenceImpl(URI.create("ivo://cadc.nrc.ca/vault"), "vault-migrate");
             dest.nodeOrigin = false; // preserve lastModified timestamps
             log.info("destination ready: " + pg.getServer() + " " + pg.getDatabase() + "\n");
             

@@ -67,10 +67,14 @@
 
 package org.opencadc.vault.migrate;
 
+import ca.nrc.cadc.vos.NodeProperty;
 import ca.nrc.cadc.vos.VOSURI;
+import ca.nrc.cadc.vos.server.db.DatabaseNodePersistence;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.log4j.Logger;
 import org.opencadc.vault.NodePersistenceImpl;
@@ -84,16 +88,21 @@ import org.opencadc.vospace.Node;
 public class MigrateNodesTask implements Runnable {
     private static final Logger log = Logger.getLogger(MigrateNodesTask.class);
 
-    private final SourceNodeIterator src;
+    private static final boolean USE_READ_QUEUE = true;
+    
+    private final DatabaseNodePersistence src;
     private final NodePersistenceImpl dest;
     private final ca.nrc.cadc.vos.ContainerNode node;
+    private final Map<Long,List<NodeProperty>> propMap;
     
     boolean dryrun = false;
     
-    public MigrateNodesTask(SourceNodeIterator src, NodePersistenceImpl dest, ca.nrc.cadc.vos.ContainerNode node) {
+    public MigrateNodesTask(DatabaseNodePersistence src, NodePersistenceImpl dest, 
+            ca.nrc.cadc.vos.ContainerNode node, Map<Long,List<NodeProperty>> propMap) {
         this.src = src;
         this.dest = dest;
         this.node = node;
+        this.propMap = propMap;
     }
 
     @Override
@@ -107,17 +116,38 @@ public class MigrateNodesTask implements Runnable {
             long pmax = 0L;
             long ptotal = 0L;
 
-            src.setContainer(node);
-            LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue = new LinkedBlockingQueue<>(2000);
-            NodeProducer producer = new NodeProducer(src, queue);
-            final String fmt = "%d %s %s";
-            boolean done = false;
-            while (!done) {
-                ca.nrc.cadc.vos.Node sn = queue.take(); // blocks
-                curURI = sn.getUri().getURI();
-                if (producer.terminate == sn) {
-                    done = true;
-                } else {
+            SourceNodeIterator srcIter = new SourceNodeIterator(src, propMap);
+            srcIter.setContainer(node);
+            if (USE_READ_QUEUE) {
+                LinkedBlockingQueue<ca.nrc.cadc.vos.Node> queue = new LinkedBlockingQueue<>(2000);
+                NodeProducer producer = new NodeProducer(srcIter, queue);
+                final String fmt = "%d %s %s";
+                boolean done = false;
+                while (!done) {
+                    ca.nrc.cadc.vos.Node sn = queue.take(); // blocks
+                    curURI = sn.getUri().getURI();
+                    if (producer.terminate == sn) {
+                        done = true;
+                    } else {
+                        Node out = conv.convert(sn);
+                        num++;
+                        log.info(String.format(fmt, num, sn.getClass().getSimpleName(), sn.getUri().getPath()));
+                        if (!dryrun) {
+                            long t1 = System.nanoTime();
+                            dest.put(out);
+                            long pt = System.nanoTime() - t1;
+                            ptotal += pt;
+                            pmin = Math.min(pmin, pt);
+                            pmax = Math.max(pmax, pt);
+                        }
+                    }
+                }
+            } else {
+                // direct src iterator
+                final String fmt = "%d %s %s";
+                while (srcIter.hasNext()) {
+                    ca.nrc.cadc.vos.Node sn = srcIter.next();
+                    curURI = sn.getUri().getURI();
                     Node out = conv.convert(sn);
                     num++;
                     log.info(String.format(fmt, num, sn.getClass().getSimpleName(), sn.getUri().getPath()));
@@ -131,7 +161,7 @@ public class MigrateNodesTask implements Runnable {
                     }
                 }
             }
-            log.info("summary " + node.getName() + " source-maxRecursionQueueSize: " + src.maxRecursionQueueSize);
+            log.info("summary " + node.getName() + " source-maxRecursionQueueSize: " + srcIter.maxRecursionQueueSize);
             
 
             if (!dryrun) {
@@ -143,9 +173,9 @@ public class MigrateNodesTask implements Runnable {
                 long totalTime = System.currentTimeMillis() - start;
                 long rate = (long) (1000L * num / totalTime);
                 log.info(String.format("summary %s count: %d source-query: %d dest-put: %d total-time: %d ms rate: %d nodes/sec", 
-                        node.getName(), num, src.timeQuerying, totalPut, totalTime, rate));
+                        node.getName(), num, srcIter.timeQuerying, totalPut, totalTime, rate));
             } else {
-                log.info("summary " + node.getName() + " source-timeQuerying: " + src.timeQuerying + "ms");
+                log.info("summary " + node.getName() + " source-timeQuerying: " + srcIter.timeQuerying + "ms");
             }
         } catch (InterruptedException ex) {
             log.warn("MigrateWorker terminating: interrupt()");

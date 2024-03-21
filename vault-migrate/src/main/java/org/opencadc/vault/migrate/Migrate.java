@@ -180,8 +180,7 @@ public class Migrate implements PrivilegedExceptionAction<Void> {
                     propertyCache = SourceNodeIterator.initPropMap();
                 }
                 ca.nrc.cadc.vos.ContainerNode icn = (ca.nrc.cadc.vos.ContainerNode) in;
-                SourceNodeIterator iter = new SourceNodeIterator(src, propertyCache);
-                MigrateNodesTask job = new MigrateNodesTask(iter, dest, icn);
+                MigrateNodesTask job = new MigrateNodesTask(src, dest, icn, propertyCache);
                 job.dryrun = dryrun;
                 queue.put(job);
             }
