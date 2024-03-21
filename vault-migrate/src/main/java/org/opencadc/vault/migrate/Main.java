@@ -68,6 +68,7 @@
 package org.opencadc.vault.migrate;
 
 import ca.nrc.cadc.ac.ACIdentityManager;
+import ca.nrc.cadc.auth.AuthenticationUtil;
 import ca.nrc.cadc.auth.IdentityManager;
 import ca.nrc.cadc.auth.SSLUtil;
 import ca.nrc.cadc.db.ConnectionConfig;
@@ -134,11 +135,12 @@ public class Main {
                 log.error("not found: servops (alt home dir)");
                 System.exit(-1);
             }
-            System.setProperty(IdentityManager.class.getName(), ACIdentityManager.class.getName());
-            
             log.info("alt home dir: " + System.getProperty("user.home"));
-            File cert = new File(System.getProperty("user.home") + "/.ssl/cadcproxy.pem");
-            Subject subject = SSLUtil.createSubject(cert);
+            
+            //System.setProperty(IdentityManager.class.getName(), ACIdentityManager.class.getName());
+            //File cert = new File(System.getProperty("user.home") + "/.ssl/cadcproxy.pem");
+            //Subject subject = SSLUtil.createSubject(cert);
+            Subject subject = AuthenticationUtil.getAnonSubject();
             log.info("running as: " + subject);
             
             String str = am.getValue("threads");
