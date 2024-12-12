@@ -88,6 +88,7 @@ import java.nio.charset.Charset;
 import java.security.PrivilegedExceptionAction;
 import org.apache.log4j.Logger;
 import org.opencadc.vospace.VOS;
+import org.opencadc.vospace.View;
 import org.opencadc.vospace.transfer.Direction;
 import org.opencadc.vospace.transfer.Protocol;
 import org.opencadc.vospace.transfer.Transfer;
@@ -108,7 +109,8 @@ public class Spyglass implements PrivilegedExceptionAction<Void> {
     // negotiation options
     public URI securityMethod;
     public URI standardID;
-
+    public URI view;
+    
     public Spyglass(URI resourceID, URI target, Direction direction) {
         this.resourceID = resourceID;
         this.target = target;
@@ -175,6 +177,7 @@ public class Spyglass implements PrivilegedExceptionAction<Void> {
         
         Transfer request = new Transfer(target, direction);
         request.version = VOS.VOSPACE_21;
+        request.setView(new View(view));
         
         URI proto = VOS.PROTOCOL_HTTPS_GET;
         if (Direction.pushToVoSpace.equals(direction)) {

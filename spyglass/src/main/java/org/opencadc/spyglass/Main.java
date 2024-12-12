@@ -114,7 +114,7 @@ public class Main {
             String t = pa.get(1);
             String secStr = am.getValue("securityMethod");
             String sidStr = am.getValue("protocol");
-            
+            String viewStr = am.getValue("view");
                         
             final Direction direction;
             if (Direction.pullFromVoSpace.getValue().equals(d)) {
@@ -137,6 +137,10 @@ public class Main {
             if (sidStr != null) {
                 sid = new URI(sidStr);
             }
+            URI view = null;
+            if (viewStr != null) {
+                view = new URI(viewStr);
+            }
             
             Subject subject = AuthenticationUtil.getAnonSubject();
             if (am.isSet("cert")) {
@@ -148,6 +152,7 @@ public class Main {
             Spyglass spy = new Spyglass(resourceID, target, direction);
             spy.securityMethod = sec;
             spy.standardID = sid;
+            spy.view = view;
             Subject.doAs(subject, spy);
             
         } catch (AccessControlException ex) {
@@ -169,11 +174,13 @@ public class Main {
         System.out.println("                target : an Artifact.uri");
         System.out.println("options:        [-v|--verbose|-d|--debug]");
         System.out.println("                [--cert=<proxy cert>]");
-        System.out.println("                [--token<access token> --domain=<server or domain name>]");
+        System.out.println("                [--token=<type>:<access token> --domain=<server or domain name>]");
         System.out.println("                [--securityMethod=<uri>] : only request these security methods");
         System.out.println("                [--protocol=<uri>] : request this protocol (e.g. standardID of an API)");
+        System.out.println("                [--view=<uri>] : request a specific view in the transfer");
         System.out.println("   example for sshfs mount:   --protocol=ivo://cadc.nrc.ca/vospace#SSHFS");
         System.out.println("   example for raw SI locate: --protocol=http://www.opencadc.org/std/storage#files-1.0");
+        System.out.println("   example for package view:  --view=vos://cadc.nrc.ca~vospace/CADC/std/Pkg-1.0");
         
     }
     

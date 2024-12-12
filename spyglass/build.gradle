@@ -12,11 +12,11 @@ repositories {
 
 apply from: '../opencadc.gradle'
 
-sourceCompatibility = 1.8
+sourceCompatibility = 11
 
 group = 'org.opencadc'
 
-version = '0.2'
+version = '0.3'
 
 mainClassName = 'org.opencadc.spyglass.Main'
 
